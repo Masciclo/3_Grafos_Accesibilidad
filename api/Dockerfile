@@ -5,9 +5,9 @@ FROM python:3.8-slim-buster
 WORKDIR /app
 
 # Copies the rest of your code to the working directory in the Docker container
-COPY /api/app /app
-COPY /api/requirements.txt /app
-COPY api/data /app
+COPY /app /app
+COPY /requirements.txt /app
+COPY /data /app
 
 
 # Install any needed packages specified in requirements.txt

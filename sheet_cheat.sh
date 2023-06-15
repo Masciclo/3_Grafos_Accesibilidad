@@ -21,9 +21,20 @@ sudo netstat -tulpn | grep LISTEN
 
 # enter into docker container
 docker exec -it grafos-accesibilidad_stationdb_1 /bin/bash
+docker exec -it grafos-accesibilidad_ciclo-py_1 /bin/bash
+
+# enter to database when u are in docker container
+psql -h localhost -U ciclo -d ciclo_dev
+
+# sheet cheat sql in cmd
+https://gist.github.com/Kartones/dd3ff5ec5ea238d4c546
 
 # stop/start postgres service 
 systemctl stop postgresql
 
 #execute script
-docker exec -it [654dbc05bf63] python main.py --inhibidores 1 --desinhibidores 1 --ciclos_path /path/to/ciclos --osm_path /path/to/osm --location "location"
+docker exec -it grafos-accesibilidad_ciclo-py_1 python main.py --inhibidores 1 --desinhibidores 1 --ciclos_path /path/to/ciclos --osm_path /path/to/osm --location "location"
+
+#restart database
+docker-compose down
+docker volume rm grafos-accesibilidad_stationdb_data
