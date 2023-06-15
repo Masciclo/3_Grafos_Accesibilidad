@@ -4,6 +4,13 @@ services:
   stationdb:
     image: pgrouting/pgrouting
     environment:
-      POSTGRES_USER: jkaub
-      POSTGRES_PASSWORD: jkaub
-      POSTGRES_DB: stations
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ciclo_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - stationdb_data:/var/lib/postgresql/data
+
+volumes:
+  stationdb_data:
