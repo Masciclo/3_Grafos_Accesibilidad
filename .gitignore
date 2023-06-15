@@ -12,3 +12,4 @@ shp_graph_metrics/*.RData
 api/app/.env
 .env
 api/data
+api/data/app/__pycache__
