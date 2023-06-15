@@ -12,5 +12,14 @@ services:
     volumes:
       - stationdb_data:/var/lib/postgresql/data
 
+  ciclo-py:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    volumes:
+      - ./api/app:/app
+    depends_on: 
+      - stationdb
+
 volumes:
   stationdb_data:
