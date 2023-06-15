@@ -7,7 +7,7 @@ WORKDIR /app
 # Copies the rest of your code to the working directory in the Docker container
 COPY /api/app /app
 COPY /api/requirements.txt /app
-COPY /data /app
+COPY api/data /app
 
 
 # Install any needed packages specified in requirements.txt

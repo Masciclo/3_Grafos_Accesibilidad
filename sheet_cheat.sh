@@ -24,3 +24,6 @@ docker exec -it grafos-accesibilidad_stationdb_1 /bin/bash
 
 # stop/start postgres service 
 systemctl stop postgresql
+
+#execute script
+docker exec -it [654dbc05bf63] python main.py --inhibidores 1 --desinhibidores 1 --ciclos_path /path/to/ciclos --osm_path /path/to/osm --location "location"

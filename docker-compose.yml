@@ -2,7 +2,9 @@ version: "3"
 
 services:
   stationdb:
-    image: pgrouting/pgrouting
+    build:
+      context: .
+      dockerfile: ./db/Dockerfile
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -11,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - stationdb_data:/var/lib/postgresql/data
+      - ./db/init-queries:/docker-entrypoint-initdb.d
 
   ciclo-py:
     build:
