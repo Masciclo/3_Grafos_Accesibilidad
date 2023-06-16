@@ -32,23 +32,45 @@ USER = os.getenv('USER')
 PASSWORD = os.getenv('PASSWORD')
 
 
+sql_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                    '..',
+                    '..', 
+                    'db',
+                    'sql-scripts')
 
-def data_pipeline(ciclo_network_path, osm_network_path, inhibitor, desinhibitor, location):
+data_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                    '..', 
+                    'data')
+
+
+def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, location):
     '''
     - Description: Execute the functions in order to get the result 
     - Input: path of csv file, postgres table name of result table, 
     list of queries (str).
     '''
     
-    # Read CSV to DataFrame
-    df_network = utils.read_csv_to_df(ciclo_network_path)
-    df_ciclos = utils.read_csv_to_df(osm_network_path)
+    # In case of None value for arguments path files
+    if ciclo_file_path is None:
+        ciclo_file_path_ = os.path.join(data_base_path,
+                                          'calidad_cliped.geojson')
+        pass
+    if osm_file_path is None:
+        osm_file_path_ = os.path.join(data_base_path,
+                                          'ejes_osm_cliped.geojson')
+        pass
 
-    network_table_name = f'{location}_network'
+
+    # Read CSV to DataFrame
+    df_osm = utils.read_csv_to_df(ciclo_file_path_)
+    df_ciclos = utils.read_csv_to_df(osm_file_path_)
+
+    # Create name of tables in db
+    network_table_name = f'{location}_osm'
     ciclos_table_name = f'{location}_ciclos'
 
     # Insert DataFrame into PostgreSQL
-    utils.df_to_postgres(df_network, 
+    utils.df_to_postgres(df_osm, 
                         network_table_name)
     utils.df_to_postgres(df_ciclos, 
                         ciclos_table_name)
@@ -57,12 +79,10 @@ def data_pipeline(ciclo_network_path, osm_network_path, inhibitor, desinhibitor,
     full_network_name = f'{location}_full_network'
     
     # Read SQL file and format query string
-    sql_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                    '..',
-                    '..', 
-                    'db',
-                    'sql-scripts',
-                    'create_full_network.sql')
+    sql_file_path = os.path.join(sql_base_path,
+                                'create_full_network.sql')
+
+    # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(result_name=full_network_name, 
                                   ciclo=ciclos_table_name, 
@@ -78,7 +98,7 @@ def data_pipeline(ciclo_network_path, osm_network_path, inhibitor, desinhibitor,
 def main():
     sys.setrecursionlimit(1500)
     args = parser.parse_args()
-    data_pipeline(args.osm_path, args.ciclos_path, args.inhib, args.desinhib, args.location)
+    data_pipeline(args.ciclos_path, args.osm_path, args.inhib, args.desinhib, args.location)
 
 if __name__=='__main__':
     main()

@@ -20,7 +20,7 @@ services:
       context: ./api
       dockerfile: Dockerfile
     volumes:
-      - ./app:/app
+      - ./api/data:/app/data
     depends_on: 
       - stationdb
 
