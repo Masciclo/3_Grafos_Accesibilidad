@@ -5,15 +5,19 @@ CREATE OR REPLACE FUNCTION delete_line_segments_in_polygon(
 BEGIN
     EXECUTE format(
         'WITH polys AS (
-            SELECT ST_Union(geom) AS geom 
+            SELECT 
+                ST_Union(geom) AS geom 
             FROM %I
         ),
         lines AS (
-            SELECT a.id, ST_Difference(a.geom, b.geom) AS geom
+            SELECT 
+                a.id, 
+                ST_Difference(a.geom, b.geom) AS geom
             FROM %I AS a, polys AS b
         )
         UPDATE %I AS l
-        SET geom = lines.geom
+        SET 
+            geom = lines.geom
         FROM lines
         WHERE l.id = lines.id AND ST_Within(lines.geom, polys.geom)', 
         polygon_table, line_table, line_table

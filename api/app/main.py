@@ -1,9 +1,6 @@
 #Python main script to procces GIS data and obtain 
 # several bike-path-oriented metrics of a given topology 
 
-#TODO: create connection, read the queries, analize parameters to use, 
-# put paremeters in sql and create pipeline with exceptions.
-
 
 import pandas as pd
 import geopandas as gpd
@@ -63,7 +60,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     # Read CSV to DataFrame
     df_osm = utils.read_csv_to_df(ciclo_file_path_)
     df_ciclos = utils.read_csv_to_df(osm_file_path_)
-    
+
     # Create name of tables in db
     osm_table_name = f'{location}_osm'
     ciclos_table_name = f'{location}_ciclos'
@@ -101,9 +98,69 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     # Connect to PostgreSQL
     conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
 
-    # Execute query
+    # Execute query to create full network
     params = ()
     utils.execute_query_with_params(conn, query, params)
+
+    # Use Inhibitor or not
+    if inhibitor:
+        # Define path to sql query and table names
+        sql_file_path_inhib = os.path.join(sql_base_path,
+                                'create_buffer.sql')
+        inhibitor_input_name = f'{location}_inhib'
+        inhibitor_result_name = f'{location}_network_inhib'
+        query_template_inhib = utils.read_sql_file(sql_file_path_inhib)
+        # Format sql query
+        query = query_template_inhib.format(result_name=inhibitor_result_name, 
+                                  inhibitor_table_name=inhibitor_input_name, 
+                                  metros=osm_table_name
+                                  # agregar todos los,
+                                  # parametros de query
+                                  ) 
+                                  
+        # Execute query formated
+        utils.execute_query_with_params(conn, query, params)
+    else:
+        print('inhibitors are not processing')
+
+
+    # Use desinhibitor or not depend on the inhibitor step
+    if desinhibitor==True & inhibitor == True:
+        desinhibitor_input_name = inhibitor_result_name
+        desinhibitor_result_name = f'{location}_network_inhib_desinhib'
+    elif desinhibitor==True & inhibitor == False:
+        desinhibitor_input_name = sql_file_path
+        desinhibitor_result_name = f'{location}_network_desinhib'
+    elif desinhibitor==False & inhibitor == True:
+        desinhibitor_result_name = f'{location}_network_inhib'
+    else:
+        pass
+
+    if desinhibitor:    
+        # Define path to sql query and table names
+        sql_file_path_desinhib = os.path.join(sql_base_path,
+                                'create_buffer.sql')
+        
+        query_template_inhib = utils.read_sql_file(sql_file_path_desinhib)
+        # Format sql query
+        query = query_template_inhib.format(buffer_name=desinhibitor_result_name, 
+                                    network_input=desinhibitor_input_name,
+                                    # add more parameters
+                                    )
+        # Execute query formated
+        utils.execute_query_with_params(conn, query, params)
+    else:
+        print('desinhibitor are not processing')
+
+
+    # Final difference
+    
+    # delete_line_segments_in_polygon
+
+    # create_clean_topology
+
+    # calculate things
+
 
 def main():
     sys.setrecursionlimit(1500)
@@ -112,24 +169,6 @@ def main():
 
 if __name__=='__main__':
     main()
-    #python3 main.py --inhibidores=0 --desinhibidores=1 --ciclos_path='../../db/data/' --osm_path=str --location=str
-
-
-
-
-
-# Example usage
-#data_pipeline('my_data.csv', 'my_table', ['SQL QUERY 1', 'SQL QUERY 2'])
-
-
-
-
-# Connect to PostgreSQL
-#conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
-
-
-
-#query_list = ['create_full_network.sql','','','','','']
 
 # create extension
 # Import ciclo

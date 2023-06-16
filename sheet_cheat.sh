@@ -33,8 +33,18 @@ https://gist.github.com/Kartones/dd3ff5ec5ea238d4c546
 systemctl stop postgresql
 
 #execute script
-docker exec -it grafos-accesibilidad_ciclo-py_1 python main.py --inhibidores=1 --desinhibidores=1 --ciclos_path='/path/to/ciclos' --osm_path= '/path/to/osm' --location="location"
-python main.py --inhibidores=1 --desinhibidores=1 --location="stgo"
+docker exec -it grafos-accesibilidad_ciclo-py_1 python main.py \
+--inhibidores=1 \
+--desinhibidores=1 \
+--ciclos_path='/path/to/ciclos' \
+--osm_path= '/path/to/osm' \
+--location="location"
+
+# execute inside the container
+python main.py \
+--inhibidores=1 \
+--desinhibidores=1 \
+--location="stgo"
 
 #restart database
 docker-compose down
