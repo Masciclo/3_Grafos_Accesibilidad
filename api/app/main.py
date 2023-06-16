@@ -13,11 +13,12 @@ import argparse
 import sys
 import utils
 
+
 parser = argparse.ArgumentParser(description='Run necessary queries to create the tables with results in postgreSQL')
 parser.add_argument("--inhibidores", dest="inhib", required=True, type=int, help="inhibir o no la red")
 parser.add_argument("--desinhibidores", dest="desinhib", required=True, type=int, help="desinhibir o no la red")
-parser.add_argument("--ciclos_path", dest="ciclos_path", required=True, type=str, help="ciclos network path")
-parser.add_argument("--osm_path", dest="osm_path", required=True, type=str, help="osm network path")
+parser.add_argument("--ciclos_path", dest="ciclos_path", required=False, type=str, help="ciclos network path")
+parser.add_argument("--osm_path", dest="osm_path", required=False, type=str, help="osm network path")
 parser.add_argument("--location", dest="location", required=True, type=str, help="location to process")
 
 
@@ -25,7 +26,7 @@ parser.add_argument("--location", dest="location", required=True, type=str, help
 load_dotenv()
 
 #define variables of
-DATABASE_NAME = os.getenv('URL_ENGINE')
+DATABASE_NAME = os.getenv('DATABASE_NAME')
 HOST = os.getenv('HOST')
 PORT = os.getenv('PORT')
 USER = os.getenv('USER')
@@ -33,13 +34,9 @@ PASSWORD = os.getenv('PASSWORD')
 
 
 sql_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                    '..',
-                    '..', 
-                    'db',
                     'sql-scripts')
 
 data_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                    '..', 
                     'data')
 
 
@@ -54,26 +51,39 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     if ciclo_file_path is None:
         ciclo_file_path_ = os.path.join(data_base_path,
                                           'calidad_cliped.geojson')
-        pass
+    else:
+        ciclo_file_path_= ciclo_file_path
     if osm_file_path is None:
         osm_file_path_ = os.path.join(data_base_path,
                                           'ejes_osm_cliped.geojson')
-        pass
+    else:
+        osm_file_path_ = osm_file_path
 
 
     # Read CSV to DataFrame
     df_osm = utils.read_csv_to_df(ciclo_file_path_)
     df_ciclos = utils.read_csv_to_df(osm_file_path_)
-
+    
     # Create name of tables in db
-    network_table_name = f'{location}_osm'
+    osm_table_name = f'{location}_osm'
     ciclos_table_name = f'{location}_ciclos'
 
     # Insert DataFrame into PostgreSQL
     utils.df_to_postgres(df_osm, 
-                        network_table_name)
+                        osm_table_name,
+                        USER,
+                        PASSWORD,
+                        HOST,
+                        PORT,
+                        DATABASE_NAME)
+
     utils.df_to_postgres(df_ciclos, 
-                        ciclos_table_name)
+                        ciclos_table_name,
+                        USER,
+                        PASSWORD,
+                        HOST,
+                        PORT,
+                        DATABASE_NAME)
 
     # Merge ciclo and vial network
     full_network_name = f'{location}_full_network'
@@ -86,7 +96,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(result_name=full_network_name, 
                                   ciclo=ciclos_table_name, 
-                                  osm=network_table_name)
+                                  osm=osm_table_name)
 
     # Connect to PostgreSQL
     conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
