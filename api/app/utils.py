@@ -32,7 +32,7 @@ def read_csv_to_df(file_path):
     return df
 
 
-def df_to_postgres(df, table_name, user, password, host, port, database_name):
+def df_to_postgres(df, table_name,geom_type, user, password, host, port, database_name):
     '''
     Description: upload a df object into a database
     Input: df object (from read_csv_to_df function) and a name for the table   
@@ -49,8 +49,10 @@ def df_to_postgres(df, table_name, user, password, host, port, database_name):
         engine, 
         if_exists='replace', 
         index=False, 
-        dtype={'geometry': Geometry('MULTILINESTRING', srid=32719)}
+        dtype={'geometry': Geometry(geom_type, srid=32719)}
     )
+
+    print('Tabla '+table_name+' cargada')
 
 
 def read_sql_file(file_path):
