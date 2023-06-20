@@ -1,5 +1,6 @@
 DROP TABLE IF EXISTS {result_name};
 
 CREATE TABLE {result_name} AS 
-SELECT ST_Union(a.geometry, b.geometry) as union_geometry 
-FROM {ciclo} AS a, {osm} AS b;
+SELECT a.geometry as the_geom FROM {ciclo} AS a 
+UNION ALL
+SELECT b.geometry as the_geom FROM {osm} AS b;
