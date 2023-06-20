@@ -1,10 +1,14 @@
 import os
+import warnings
 import psycopg2
 import geopandas as gpd
 from sqlalchemy import create_engine
 from geoalchemy2 import Geometry, WKTElement
 from shapely import wkt
 import shapely.geometry.base
+
+#Ignore warning
+warnings.filterwarnings('ignore', 'GeoSeries.notna', UserWarning)
 
 def create_conn(database_name, host, port, user, password):
     '''
