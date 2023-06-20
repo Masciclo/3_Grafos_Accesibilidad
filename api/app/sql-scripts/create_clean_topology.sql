@@ -1,7 +1,13 @@
-BEGIN;
+-- Crear el esquema si no existe
+CREATE SCHEMA IF NOT EXISTS topology;
 
-SELECT topology.CreateTopology('{topo_name}', {srid});
-SELECT topology.AddTopoGeometryColumn('{topo_name}', 'public', '{shp}', 'topo_geom', 'LINESTRING');
-UPDATE "{shp}" SET topo_geom = topology.toTopoGeom('{geometry}', '{topo_name}', 1, 0.001);
+-- Crear la topología
+SELECT topology.CreateTopology('{topo}', {srid});
 
-COMMIT;
+-- Agregar una columna de topología a tu tabla
+SELECT topology.AddTopoGeometryColumn('{topo}', 'public', '{table}', 'topogeom', 'LINESTRING');
+
+-- Llenar la columna de topología con los datos de tu tabla
+UPDATE public.{table}
+SET topogeom = topology.toTopoGeom(the_geom, '{topo}', 1);
+
