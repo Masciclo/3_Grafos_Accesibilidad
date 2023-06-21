@@ -56,7 +56,7 @@ def df_to_postgres(df, table_name,geom_type, user, password, host, port, databas
         dtype={'geometry': Geometry(geom_type, srid=32719)}
     )
 
-    print('Tabla '+table_name+' cargada')
+    print('Table '+table_name+' imported')
 
 
 def read_sql_file(file_path):
