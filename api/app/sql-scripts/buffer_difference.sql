@@ -1,8 +1,8 @@
-CREATE TABLE IF NOT EXISTS buffers.bf_{nombre_resultado} AS 
+CREATE TABLE IF NOT EXISTS buffers.bf_{result_name} AS 
 SELECT 
     ST_Difference(bi.geometry, bd.geometry) AS geometry 
-FROM buffers.{buffer_inhibidores} bi, 
-    buffers.{buffer_desinhibidores} bd; 
+FROM buffers.{buffer_inhibitor} bi, 
+    buffers.{buffer_desinhibitor} bd; 
 
-CREATE INDEX IF NOT EXISTS idx_bf_{nombre_resultado} 
-ON buffers.bf_{nombre_resultado} USING GIST(geometry);
+CREATE INDEX IF NOT EXISTS idx_bf_{result_name} 
+ON buffers.bf_{result_name} USING GIST(geometry);
