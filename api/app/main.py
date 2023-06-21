@@ -13,11 +13,12 @@ import utils
 
 parser = argparse.ArgumentParser(description='Run necessary queries to create the tables with results in postgreSQL')
 parser.add_argument("--inhibidores", dest="inhib", required=False, type=str, help="inhibir o no la red")
-parser.add_argument("--desinhibidores", dest="desinhib", required=True, type=int, help="desinhibir o no la red")
+parser.add_argument("--buffer_inhibidores", dest="buffer_inhib", required=False, type=float, help="metros de buffer aplicado a los inhibidores")
+parser.add_argument("--desinhibidores", dest="desinhib", required=False, type=str, help="desinhibir o no la red")
+parser.add_argument("--buffer_desinhibidores", dest="buffer_desinhib", required=False, type=float, help="metros de buffer aplicado a los desinhibidores")
 parser.add_argument("--ciclos_path", dest="ciclos_path", required=False, type=str, help="ciclos network path")
 parser.add_argument("--osm_path", dest="osm_path", required=False, type=str, help="osm network path")
 parser.add_argument("--location", dest="location", required=True, type=str, help="location to process")
-
 
 #load env variables
 load_dotenv()
@@ -37,7 +38,7 @@ data_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     'data')
 
 
-def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, location):
+def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_inhib, desinhibitor_file_path, buffer_desinhib, location):
     '''
     - Description: Execute the functions in order to get the result 
     - Input: path of csv file, postgres table name of result table, 
@@ -55,21 +56,30 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
                                           'ejes_osm_cliped.geojson')
     else:
         osm_file_path_ = osm_file_path
-    if inhibitor is None:
-        inhibitor = os.path.join(data_base_path,
+    if inhibitor_file_path is None:
+        inhibitor_file_path_ = os.path.join(data_base_path,
+                                 'highways.geojson')
+    else:
+        inhibitor_file_path_ = inhibitor_file_path
+    if desinhibitor_file_path is None:
+        desinhibitor_file_path_ = os.path.join(data_base_path,
                                  'semaforos.geojson')
+    else:
+        desinhibitor_file_path_ = desinhibitor_file_path
 
     # Read CSV to DataFrame
     df_osm = utils.read_csv_to_df(ciclo_file_path_)
     df_ciclos = utils.read_csv_to_df(osm_file_path_)
-    df_inhibitor = utils.read_csv_to_df(inhibitor)
+    df_inhibitor = utils.read_csv_to_df(inhibitor_file_path_)
+    df_desinhibitor = utils.read_csv_to_df(desinhibitor_file_path_)
 
     # Create name of tables in db
     osm_table_name = f'{location}_osm'
     ciclos_table_name = f'{location}_ciclos'
     inhibitor_table_name = f'{location}_inhibitor'
+    desinhibitor_table_name = f'{location}_desinhibitor'
 
-    # Insert DataFrame into PostgreSQL
+    # Insert OSM DataFrame into PostgreSQL
     utils.df_to_postgres(df_osm, 
                         osm_table_name,
                         'MULTILINESTRING',
@@ -86,6 +96,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     query = query_template.format(layer_name=osm_table_name, 
                                   schema_name='public')
     
+    # Insert ciclos DataFrame into PostgreSQL
     utils.df_to_postgres(df_ciclos, 
                         ciclos_table_name,
                         'MULTILINESTRING',
@@ -102,9 +113,10 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     query = query_template.format(layer_name=ciclos_table_name, 
                                   schema_name='public')
 
+    # Insert inhibitor DataFrame into PostgreSQL
     utils.df_to_postgres(df_inhibitor,
                          inhibitor_table_name,
-                         'POINT',
+                         'MULTILINESTRING',
                          USER,
                          PASSWORD,
                          HOST,
@@ -115,6 +127,22 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
                                 'create_spatial_index.sql')
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(layer_name=inhibitor_table_name, 
+                                  schema_name='public')
+    
+    # Insert desinhibitor DataFrame into PostgreSQL
+    utils.df_to_postgres(df_desinhibitor,
+                         desinhibitor_table_name,
+                         'POINT',
+                         USER,
+                         PASSWORD,
+                         HOST,
+                         PORT,
+                         DATABASE_NAME)
+    
+    sql_file_path = os.path.join(sql_base_path,
+                                'create_spatial_index.sql')
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(layer_name=desinhibitor_table_name, 
                                   schema_name='public')
 
     
@@ -135,7 +163,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
 
     # Execute query to create full network
-    print('Creando red intermodal')
+    print('Creating intermodal network')
     params = ()
     utils.execute_query_with_params(conn, query, params)
     
@@ -146,60 +174,60 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
     query = query_template.format(layer_name=full_network_name, 
                                   schema_name='public')
 
-
-    """
     # Use Inhibitor or not
-    if inhibitor:
+    if inhibitor_file_path:
         # Define path to sql query and table names
-        sql_file_path_inhib = os.path.join(sql_base_path,
+        sql_file_path_buffer = os.path.join(sql_base_path,
                                 'create_buffer.sql')
         inhibitor_input_name = inhibitor_table_name
         inhibitor_result_name = f'{location}_network_inhib'
-        query_template_inhib = utils.read_sql_file(sql_file_path_inhib)
+        query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
         # Format sql query
-        query = query_template_inhib.format(result_name=inhibitor_result_name, 
+        query = query_template_buffer.format(result_name=inhibitor_result_name, 
                                   table_name=inhibitor_input_name, 
-                                  metros=50
-                                  # agregar todos los,
-                                  # parametros de query
+                                  metros=buffer_inhib
                                   ) 
                                   
         # Execute query formated
+        print('Creating inhibitor buffer')
         utils.execute_query_with_params(conn, query, params)
-    else:
-        print('inhibitors are not processing')
-
-
-    # Use desinhibitor or not depend on the inhibitor step
-    if desinhibitor==True & inhibitor == True:
-        desinhibitor_input_name = inhibitor_result_name
-        desinhibitor_result_name = f'{location}_network_inhib_desinhib'
-    elif desinhibitor==True & inhibitor == False:
-        desinhibitor_input_name = sql_file_path
-        desinhibitor_result_name = f'{location}_network_desinhib'
-    elif desinhibitor==False & inhibitor == True:
-        desinhibitor_result_name = f'{location}_network_inhib'
-    else:
-        pass
-
-    if desinhibitor:    
-        # Define path to sql query and table names
-        sql_file_path_desinhib = os.path.join(sql_base_path,
+        # Use Desinhibitor or not
+        if desinhibitor_file_path:
+            sql_file_path_buffer = os.path.join(sql_base_path,
                                 'create_buffer.sql')
-        
-        query_template_inhib = utils.read_sql_file(sql_file_path_desinhib)
-        # Format sql query
-        query = query_template_inhib.format(buffer_name=desinhibitor_result_name, 
-                                    network_input=desinhibitor_input_name,
-                                    # add more parameters
-                                    )
-        # Execute query formated
-        utils.execute_query_with_params(conn, query, params)
-    else:
-        print('desinhibitor are not processing')
-    """
+            desinhibitor_input_name = desinhibitor_table_name
+            desinhibitor_result_name = f'{location}_network_desinhib'
+            query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
+            # Format sql query
+            query = query_template_buffer.format(result_name=desinhibitor_result_name, 
+                                      table_name=desinhibitor_input_name, 
+                                      metros=buffer_desinhib
+                                      ) 
 
-    # Final difference
+            # Execute query formated
+            print('Creating desinhibitor buffer')
+            utils.execute_query_with_params(conn, query, params)
+
+            # Creating final buffer
+            sql_file_path_final_buffer = os.path.join(sql_base_path,
+                                'buffer_difference.sql')
+            buffer_final_input_name = f'{location}_final_buffer'
+            query_template_final_buffer = utils.read_sql_file(sql_file_path_final_buffer)
+            # Format sql query
+            query = query_template_final_buffer.format(result_name=buffer_final_input_name, 
+                                      buffer_inhibitor=inhibitor_result_name, 
+                                      buffer_desinhibitor=desinhibitor_result_name
+                                      ) 
+
+            # Execute query formated
+            print('Calculating buffer difference')
+            utils.execute_query_with_params(conn, query, params)
+        else:
+            print('desinhibitor are not processing')
+        
+
+    else:
+        print('Not inhibition applied')
     
     # delete_line_segments_in_polygon
 
@@ -241,7 +269,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor, desinhibitor, locat
 def main():
     sys.setrecursionlimit(1500)
     args = parser.parse_args()
-    data_pipeline(args.ciclos_path, args.osm_path, args.inhib, args.desinhib, args.location)
+    data_pipeline(args.ciclos_path, args.osm_path, args.inhib, args.buffer_inhib, args.desinhib, args.buffer_desinhib, args.location)
 
 if __name__=='__main__':
     main()
@@ -254,11 +282,11 @@ if __name__=='__main__':
 #If inhibidores
     #Import inhibidores
     #bf_inhibidores = create_buffer(inhibidores)
-#If desinhibidores
-    #Import desinhibidores
-    #bf_desinhibidores = create_buffer(desinhibidores)
-#bf_final = buffer_difference(buffer_inhibidores,buffer_desinhibidores)
-#final_network = delete_line_segments_in_polygon(full_network,bf_final)  
+    #If desinhibidores
+        #Import desinhibidores
+        #bf_desinhibidores = create_buffer(desinhibidores)
+    #bf_final = buffer_difference(buffer_inhibidores,buffer_desinhibidores)
+    #final_network = delete_line_segments_in_polygon(full_network,bf_final)  
 #create_clean_topology(final_network)
 
 # Execute SQL queries
