@@ -9,5 +9,5 @@ SELECT topology.AddTopoGeometryColumn('{topo}', 'public', '{table}', 'topogeom',
 
 -- Llenar la columna de topología con los datos de tu tabla
 UPDATE public.{table}
-SET topogeom = topology.toTopoGeom(the_geom, '{topo}', 1);
+SET topogeom = topology.toTopoGeom(geometry, '{topo}', 1);
 
