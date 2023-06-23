@@ -68,8 +68,8 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
         desinhibitor_file_path_ = desinhibitor_file_path
 
     # Read CSV to DataFrame
-    df_osm = utils.read_csv_to_df(ciclo_file_path_)
-    df_ciclos = utils.read_csv_to_df(osm_file_path_)
+    df_osm = utils.read_csv_to_df(osm_file_path_)
+    df_ciclos = utils.read_csv_to_df(ciclo_file_path_)
     df_inhibitor = utils.read_csv_to_df(inhibitor_file_path_)
     df_desinhibitor = utils.read_csv_to_df(desinhibitor_file_path_)
 
@@ -132,7 +132,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
     # Insert desinhibitor DataFrame into PostgreSQL
     utils.df_to_postgres(df_desinhibitor,
                          desinhibitor_table_name,
-                         'POINT',
+                         'MULTILINESTRING',
                          USER,
                          PASSWORD,
                          HOST,
@@ -222,18 +222,42 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
             # Execute query formated
             print('Calculating buffer difference')
             utils.execute_query_with_params(conn, query, params)
+
+            # delete_line_segments_in_polygon
+            sql_file_path_inhibit_network = os.path.join(sql_base_path,
+                                        'create_inhibited_network.sql')
+            scenery_name = f'{location}_inhibited'
+            query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
+            # Format sql query
+            query = query_template_inhibit_network.format(result_name=scenery_name, 
+                                      network_name=full_network_name, 
+                                      buffer_name=buffer_final_input_name
+                                      )
+            # Execute query formated
+            print('Inhibiting the network')
+            utils.execute_query_with_params(conn, query, params)
+
         else:
             print('desinhibitor are not processing')
-        
+
+            sql_file_path_inhibit_network = os.path.join(sql_base_path,
+                                        'create_inhibited_network.sql')
+            scenery_name = f'{location}_inhibited'
+            query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
+            # Format sql query
+            query = query_template_inhibit_network.format(result_name=scenery_name, 
+                                      network_name=full_network_name, 
+                                      buffer_name=inhibitor_result_name
+                                      )
+            # Execute query formated
+            print('Inhibiting the network')
+            utils.execute_query_with_params(conn, query, params)
 
     else:
         print('Not inhibition applied')
-    
-    # delete_line_segments_in_polygon
 
     # Create and clean the topology
-
-    topology_table_name = full_network_name+'_topo'
+    topology_table_name = scenery_name+'_topo'
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
                                 'create_clean_topology.sql')
@@ -242,7 +266,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(topo=topology_table_name,
                                   srid=32719,
-                                  table=full_network_name)
+                                  table=scenery_name)
     print('Generando Topología')                      
     params = ()
     utils.execute_query_with_params(conn, query, params)
@@ -255,7 +279,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
     components_table_name = full_network_name+'_components'                           
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(topo=topology_table_name,
-                                  components_table=components_table_name)
+                                  table_name=full_network_name)
     print('Calculando componentes')                      
     params = ()
     utils.execute_query_with_params(conn, query, params)
