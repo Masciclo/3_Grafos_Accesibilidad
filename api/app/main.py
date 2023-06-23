@@ -20,6 +20,7 @@ parser.add_argument("--ciclos_path", dest="ciclos_path", required=False, type=st
 parser.add_argument("--osm_path", dest="osm_path", required=False, type=str, help="osm network path")
 parser.add_argument("--location", dest="location", required=True, type=str, help="location to process")
 
+
 #load env variables
 load_dotenv()
 
@@ -180,7 +181,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
         sql_file_path_buffer = os.path.join(sql_base_path,
                                 'create_buffer.sql')
         inhibitor_input_name = inhibitor_table_name
-        inhibitor_result_name = f'{location}_network_inhib'
+        inhibitor_result_name = f'{location}_network_inhib'+f'_{buffer_inhib}'
         query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
         # Format sql query
         query = query_template_buffer.format(result_name=inhibitor_result_name, 
@@ -196,7 +197,7 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
             sql_file_path_buffer = os.path.join(sql_base_path,
                                 'create_buffer.sql')
             desinhibitor_input_name = desinhibitor_table_name
-            desinhibitor_result_name = f'{location}_network_desinhib'
+            desinhibitor_result_name = f'{location}_network_desinhib'+f'_{buffer_inhib}'
             query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
             # Format sql query
             query = query_template_buffer.format(result_name=desinhibitor_result_name, 
@@ -287,6 +288,9 @@ def data_pipeline(ciclo_file_path, osm_file_path, inhibitor_file_path, buffer_in
     # Calculate Betweenness centrality
 
     # Calculate Closeness
+
+    # stgo_inhib_0_desinhib_0_
+    # stgo_inhib_15_desinhib_25_proye_0)
     
 
 
