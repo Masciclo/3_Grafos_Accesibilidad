@@ -9,7 +9,7 @@ BEGIN
         -- Si metros no es igual a 0, crear la tabla de buffers y su correspondiente índice
         IF {metros} != 0 THEN
             CREATE TABLE buffers.{result_name} AS (
-                SELECT ST_BUFFER(geometry,{metros}) as geometry FROM {table_name}
+                SELECT st_union(ST_BUFFER(geometry,{metros})) as geometry FROM {table_name}
             );
             CREATE INDEX {result_name}_geom_idx ON buffers.{result_name} USING GIST (geometry);
         END IF;
