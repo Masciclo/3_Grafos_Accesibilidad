@@ -7,6 +7,9 @@ from geoalchemy2 import Geometry, WKTElement
 from shapely import wkt
 import shapely.geometry.base
 
+sql_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                    'sql-scripts')
+
 #Ignore warning
 warnings.filterwarnings('ignore', 'GeoSeries.notna', UserWarning)
 
@@ -56,6 +59,18 @@ def df_to_postgres(df, table_name,geom_type, user, password, host, port, databas
         dtype={'geometry': Geometry(geom_type, srid=32719)}
     )
 
+    #Create spatial Index 
+    sql_file_path = os.path.join(sql_base_path,
+                                'create_spatial_index.sql')
+    query_template = read_sql_file(sql_file_path)
+    query = query_template.format(layer_name=table_name, 
+                                schema_name='public')
+    # create connection
+    conn = create_conn(database_name,host,port,user,password)
+    params = ()
+    # execute query
+    execute_query_with_params(conn, query, params)
+
     print('Table '+table_name+' imported')
 
 
@@ -69,6 +84,7 @@ def read_sql_file(file_path):
         sql = file.read()
     return sql
 
+
 def execute_query_with_params(conn, query, params):
     '''
     Description: Executes a query on a connection with given parameters
@@ -77,3 +93,61 @@ def execute_query_with_params(conn, query, params):
     with conn.cursor() as cursor:
         cursor.execute(query, params)
         conn.commit()
+
+
+def check_table_existence(conn, table_name):
+    '''
+    Description: This function checks if a table exists in the connected database
+    Input: conn - connection object, table_name - string
+    Output: Boolean value indicating if the table exists
+    '''
+    query = """
+        SELECT EXISTS (
+            SELECT FROM information_schema.tables 
+            WHERE  table_name   = %s
+        );
+    """
+    with conn.cursor() as cursor:
+        cursor.execute(query, (table_name,))
+        return cursor.fetchone()[0]
+
+
+def handle_path_argument(path_arg, base_file_path, table_name, geom_type, user, password, host, port, database_name):
+    '''
+    Description: This function handles path input argument in three different ways based on its value
+    Input: path_arg - input argument which can be None, 'osm', or 'string_path'
+           location - the location used to form the table name
+           osm_file_path - the path of the base osm file
+           conn - database connection
+           table_name - the name of the table in the database
+           geom_type - the geometry type of the spatial data
+           user, password, host, port, database_name - database credentials
+    Output: None, but has side effects like creating a table in the database
+    '''
+
+    conn = create_conn(database_name,host,port,user,password)
+
+    if path_arg == '':
+        # if exist then skipp, else upload base file example
+        if check_table_existence(conn, table_name):
+            print(f'Table {table_name} already exists, skipping import.')
+        else:
+            df_osm = read_csv_to_df(base_file_path)
+            df_to_postgres(df_osm, table_name, geom_type, 
+                            user=user, password=password, host=host, 
+                            port=port, database_name=database_name)
+            print(f'Table {table_name} is loaded into database')
+
+    
+    elif path_arg == 'osm':
+        # download_osm function should return the path to the downloaded file
+        df_osm = download_osm()
+        df_to_postgres(df_osm, table_name, geom_type, 
+                        user=user, password=password, host=host, 
+                        port=port, database_name=database_name)
+
+    else:  # path_arg is a string path
+        df_osm = read_csv_to_df(path_arg)
+        df_to_postgres(df_osm, table_name, geom_type, 
+                        user=user, password=password, host=host, 
+                        port=port, database_name=database_name)

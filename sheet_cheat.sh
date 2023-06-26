@@ -34,17 +34,28 @@ systemctl stop postgresql
 
 #execute script
 docker exec -it grafos-accesibilidad_ciclo-py_1 python main.py \
---inhibidores='/data/highways.geojson' \
---buffer_inhibidores=15 \
---desinhibidores='/data/calidad_cliped.geojson'\
---buffer_desinhibidores=25 \
---location="stgo"
+--osm_input= \
+--ciclo_input \
+--location\
+--inhibit\
+--inhibitor_input\
+--buffer_inhibidores\
+--disinhit\
+--disinhitor_input\
+--buffer_disinhibitor\
 
 # execute inside the container
 python main.py \
---inhibidores=1 \
---desinhibidores=1 \
---location="stgo"
+--osm_input='' \
+--ciclo_input='' \
+--location='santiago' \
+--inhibit=1 \
+--inhibitor_input='data/highways.geojson' \
+--buffer_inhibidores=15 \
+--disinhit=1 \
+--disinhitor_input='data/calidad_cliped.geojson' \
+--buffer_disinhibitor=25 
+
 
 #restart database
 docker-compose down

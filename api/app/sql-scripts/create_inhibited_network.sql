@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS {result_name};
+
 create table {result_name} as
 	select
 	network.id,
