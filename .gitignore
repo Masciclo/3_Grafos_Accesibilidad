@@ -13,3 +13,7 @@ api/app/.env
 .env
 api/data
 api/data/app/__pycache__
+myenv
+.vscode
+cache
+cache
