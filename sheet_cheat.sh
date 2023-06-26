@@ -34,25 +34,25 @@ systemctl stop postgresql
 
 #execute script
 docker exec -it grafos-accesibilidad_ciclo-py_1 python main.py \
---osm_input= \
+--osm_input \
 --ciclo_input \
---location\
---inhibit\
---inhibitor_input\
---buffer_inhibidores\
---disinhit\
---disinhitor_input\
---buffer_disinhibitor\
+--location \
+--inhibit \
+--inhibitor_input \
+--buffer_inhibidores \
+--disinhit \
+--disinhitor_input \
+--buffer_disinhibitor \
 
 # execute inside the container
 python main.py \
 --osm_input='' \
 --ciclo_input='' \
 --location='santiago' \
---inhibit=1 \
+--inhibit=0 \
 --inhibitor_input='data/highways.geojson' \
 --buffer_inhibidores=15 \
---disinhit=1 \
+--disinhit=0 \
 --disinhitor_input='data/calidad_cliped.geojson' \
 --buffer_disinhibitor=25 
 
