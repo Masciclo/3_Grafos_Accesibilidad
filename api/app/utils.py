@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from geoalchemy2 import Geometry, WKTElement
 from shapely import wkt
 import shapely.geometry.base
+import osmnx as ox
 
 sql_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     'sql-scripts')
@@ -84,6 +85,16 @@ def read_sql_file(file_path):
         sql = file.read()
     return sql
 
+def download_osm(area,network_type):
+    # Download data from OSM
+    graph = ox.graph_from_place(area, network_type=network_type)
+    edges = ox.graph_to_gdfs(graph, nodes=False, edges=True)
+
+    # Filter LineStrings
+    lines = edges[edges['geometry'].geom_type == 'LineString']
+
+    # Return the result
+    return(lines)
 
 def execute_query_with_params(conn, query, params):
     '''
