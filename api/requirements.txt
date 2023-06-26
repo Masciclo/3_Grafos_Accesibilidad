@@ -4,3 +4,4 @@ psycopg2-binary==2.9.6
 sqlalchemy==2.0.15
 geoalchemy2==0.13.3
 python-dotenv==1.0.0
+osmnx==1.*
