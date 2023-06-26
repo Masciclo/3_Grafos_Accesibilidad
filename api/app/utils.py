@@ -85,9 +85,9 @@ def read_sql_file(file_path):
         sql = file.read()
     return sql
 
-def download_osm(area,network_type):
+def download_osm(area):
     # Download data from OSM
-    graph = ox.graph_from_place(area, network_type=network_type)
+    graph = ox.graph_from_place(area, network_type='all')
     edges = ox.graph_to_gdfs(graph, nodes=False, edges=True)
 
     # Filter LineStrings
