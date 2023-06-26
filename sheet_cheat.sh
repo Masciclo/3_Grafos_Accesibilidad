@@ -49,10 +49,10 @@ python main.py \
 --osm_input='' \
 --ciclo_input='' \
 --location='santiago' \
---inhibit=0 \
+--inhibit=1 \
 --inhibitor_input='data/highways.geojson' \
 --buffer_inhibidores=15 \
---disinhit=0 \
+--disinhit=1 \
 --disinhitor_input='data/calidad_cliped.geojson' \
 --buffer_disinhibitor=25 
 

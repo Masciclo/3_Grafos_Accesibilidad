@@ -246,10 +246,10 @@ def data_pipeline(osm_input, ciclo_input, location, inhibit, inhibitor_input, bu
                                 'calculate_components.sql')
 
     # Read template query and add parameters
-    components_table_name = full_network_name+'_components'                           
+    components_table_name = scenery_name+'_components'                           
     query_template = utils.read_sql_file(sql_file_path)
-    query = query_template.format(topo=components_table_name,
-                                  table_name=full_network_name)
+    query = query_template.format(topo=topology_table_name,
+                                  table_name=components_table_name)
     print('Calculando componentes')                      
     params = ()
     utils.execute_query_with_params(conn, query, params)
