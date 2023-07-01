@@ -3,10 +3,14 @@
 This app use PostgreSQL with PostGIS and PgRouting libraries as a database running in docker. 
 
 TODO: 
--- [Pedro] agregar función generica que si ya existe la capa no se vuelva a subir.
--- [Pedro] Mantener indice unico y general para filtrar mas adelante.
--- [Pedro] generar filtros.
+-- [ignacio] Mantener indice unico y general para filtrar mas adelante.
+-- [Pedro/ignacio] incluir filtro en parámetros de entrada / cambiar create_full_network .
 -- [ignacio] Estandarizar geoms.
--- [ignacio] generar función para traspasar información a hexágonos.
 -- [ignacio] accesibilidad.
--- [ignacio] refactorizar bajada osm.
+-- [Pedro] incorporar el location a los parámetros de entrada 
+-- [Pedro] modificar flujo de main
+    -- [ignacio] modificar querys 
+    -- [Pedro] inhibir osm antes de unir con ciclos
+-- [Pedro/ignacio] parametrizar srid python/sql srid
+
+-- [] agregar srid a hexágonos
