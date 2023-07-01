@@ -51,7 +51,7 @@ data_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     'data')
 
 
-def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_input, buffer_inhib, disinhit, disinhitor_input, buffer_desinhib, proye, ci_o_cr, op_ci):
+def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibitor_input, buffer_inhib, disinhit, disinhitor_input, buffer_desinhib, proye, ci_o_cr, op_ci):
     '''
     - Description: Execute the functions in order to get the result 
     - Input: path of csv file, postgres table name of result table, 
@@ -59,7 +59,10 @@ def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_inp
     '''
     print(f'the input arg is {osm_input}')
     print(f'and the type is {type(osm_input)}')
-    # Create name of tables in db
+
+    #create an abbreviated name for handle the area
+    location = utils.create_abbreviation(location_input)
+
     osm_table_name = f'{location}_osm'
     ciclo_table_name = f'{location}_ciclos'
     inhibitor_table_name = f'{location}_inhibitor'
@@ -79,6 +82,7 @@ def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_inp
     utils.handle_path_argument(osm_input,
                                osm_base_path,
                                osm_table_name,
+                               location_input,
                                'MULTILINESTRING',
                                USER,
                                PASSWORD,
@@ -90,6 +94,7 @@ def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_inp
     utils.handle_path_argument(ciclo_input,
                                ciclo_base_path,
                                ciclo_table_name,
+                               location_input,
                                'MULTILINESTRING',
                                USER,
                                PASSWORD,
@@ -101,6 +106,7 @@ def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_inp
     utils.handle_path_argument(inhibitor_input,
                                inhibitor_base_path,
                                inhibitor_table_name,
+                               location_input,
                                'MULTILINESTRING',
                                USER,
                                PASSWORD,
@@ -112,6 +118,7 @@ def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_inp
     utils.handle_path_argument(disinhitor_input,
                                desinhibitor_base_path,
                                desinhibitor_table_name,
+                               location_input,
                                'MULTILINESTRING',
                                USER,
                                PASSWORD,

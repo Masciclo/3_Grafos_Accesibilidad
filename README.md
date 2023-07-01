@@ -4,10 +4,10 @@ This app use PostgreSQL with PostGIS and PgRouting libraries as a database runni
 
 TODO: 
 -- [ignacio] Mantener indice unico y general para filtrar mas adelante.
--- [Pedro/ignacio] incluir filtro en parámetros de entrada / cambiar create_full_network .
+-- [Pedro/ignacio] testear filtros (create full network).
 -- [ignacio] Estandarizar geoms.
 -- [ignacio] accesibilidad.
--- [Pedro] incorporar el location a los parámetros de entrada 
+-- [Pedro] testear osm para vias principales, ver que hacer con otros tipos de caminos 
 -- [Pedro] modificar flujo de main
     -- [ignacio] modificar querys 
     -- [Pedro] inhibir osm antes de unir con ciclos

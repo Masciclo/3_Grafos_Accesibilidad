@@ -85,6 +85,12 @@ def read_sql_file(file_path):
         sql = file.read()
     return sql
 
+def create_abbreviation(area):
+    words = area.split(", ")
+    abbreviation = "".join([word[:4].upper() for word in words])
+    return abbreviation
+
+
 def download_osm(area):
     # Download data from OSM
     graph = ox.graph_from_place(area, network_type='all')
@@ -149,7 +155,7 @@ def check_table_existence(conn, table_name):
         return cursor.fetchone()[0]
 
 ##Revisar location
-def handle_path_argument(path_arg, base_file_path, table_name, location, geom_type, user, password, host, port, database_name):
+def handle_path_argument(path_arg, base_file_path, table_name, location, location_input, geom_type, user, password, host, port, database_name):
     '''
     Description: This function handles path input argument in three different ways based on its value
     Input: path_arg - input argument which can be None, 'osm', or 'string_path'
@@ -178,7 +184,7 @@ def handle_path_argument(path_arg, base_file_path, table_name, location, geom_ty
     
     elif path_arg == 'osm':
         # download_osm function should return the path to the downloaded file
-        df_osm = download_osm(location)
+        df_osm = download_osm(location_input)
         df_to_postgres(df_osm, table_name, geom_type, 
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
