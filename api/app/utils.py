@@ -93,8 +93,16 @@ def download_osm(area):
     # Filter LineStrings
     lines = edges[edges['geometry'].geom_type == 'LineString']
 
+    # Filter selected highways
+    usable_highway = ['residential',
+                      'primary',
+                      'secondary',
+                      'tertiary']
+    
+    filter_lines = lines[lines['highway'].isin(usable_highway)]
+
     # Return the result
-    return(lines)
+    return(filter_lines)
 
 def execute_query_with_params(conn, query, params):
     '''
@@ -122,8 +130,8 @@ def check_table_existence(conn, table_name):
         cursor.execute(query, (table_name,))
         return cursor.fetchone()[0]
 
-
-def handle_path_argument(path_arg, base_file_path, table_name, geom_type, user, password, host, port, database_name):
+##Revisar location
+def handle_path_argument(path_arg, base_file_path, table_name, location, geom_type, user, password, host, port, database_name):
     '''
     Description: This function handles path input argument in three different ways based on its value
     Input: path_arg - input argument which can be None, 'osm', or 'string_path'
@@ -152,7 +160,7 @@ def handle_path_argument(path_arg, base_file_path, table_name, geom_type, user, 
     
     elif path_arg == 'osm':
         # download_osm function should return the path to the downloaded file
-        df_osm = download_osm()
+        df_osm = download_osm(location)
         df_to_postgres(df_osm, table_name, geom_type, 
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
