@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser(description='Run necessary queries to create th
 parser.add_argument("--osm_input", dest="osm_input", required=False, type=str, help="osm network path")
 parser.add_argument("--ciclo_input", dest="ciclo_input", required=False, type=str, help="ciclos network path")
 parser.add_argument("--location", dest="location", required=True, type=str, help="location to process")
+parser.add_argument("--srid", dest="srid", required=False, type=str, help="SRID to use for calculate distance/metrics")
 
 parser.add_argument("--inhibit", dest="inhibit", required=True, type=int, help="inhibir o no la red")
 parser.add_argument("--inhibitor_input", dest="inhibitor_input", required=False, type=str, help="input of inibitor: None, 'osm' 'path/to/file'")
@@ -24,6 +25,9 @@ parser.add_argument("--disinhit", dest="disinhit", required=True, type=int, help
 parser.add_argument("--disinhitor_input", dest="disinhitor_input", required=False, type=str, help="input of dishinibitor: None, 'osm' 'path/to/file' ")
 parser.add_argument("--buffer_disinhibitor", dest="buffer_desinhib", required=False, type=int, help="metros de buffer aplicado a los desinhibidores")
 
+parser.add_argument("--proye", dest="proye", required=False, type=int, help="filter by parameter proye")
+parser.add_argument("--ci_o_cr", dest="ci_o_cr", required=False, type=int, help="filter by parameter ci_o_cr or 'bikepath or cross path'")
+parser.add_argument("--op_ci", dest="op_ci", required=False, type=int, help="filter by parameter op_ci operativity of the bikepath")
 
 
 #load env variables
@@ -47,7 +51,7 @@ data_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     'data')
 
 
-def data_pipeline(osm_input, ciclo_input, location, inhibit, inhibitor_input, buffer_inhib, disinhit, disinhitor_input, buffer_desinhib):
+def data_pipeline(osm_input, ciclo_input, location, srid, inhibit, inhibitor_input, buffer_inhib, disinhit, disinhitor_input, buffer_desinhib, proye, ci_o_cr, op_ci):
     '''
     - Description: Execute the functions in order to get the result 
     - Input: path of csv file, postgres table name of result table, 
@@ -124,11 +128,18 @@ def data_pipeline(osm_input, ciclo_input, location, inhibit, inhibitor_input, bu
     sql_file_path = os.path.join(sql_base_path,
                                 'create_full_network.sql')
 
+    #proye, ci_o_cr, op_ci
+    filters = utils.create_filters_string(proye, ci_o_cr,op_ci)
+    
+    # Add the WHERE clause only if there are filters to apply
+    where_clause = f"WHERE {filters}" if filters else ""
+
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(result_name=full_network_name, 
                                   ciclo=ciclo_table_name, 
-                                  osm=osm_table_name)
+                                  osm=osm_table_name,
+                                  filters=where_clause)
 
 
     # Execute query to create full network
@@ -269,12 +280,16 @@ def main():
     data_pipeline(args.osm_input, 
                   args.ciclo_input, 
                   args.location,
+                  args.srid,
                   args.inhibit,
                   args.inhibitor_input, 
                   args.buffer_inhib, 
                   args.disinhit,
                   args.disinhitor_input, 
-                  args.buffer_desinhib, 
+                  args.buffer_desinhib,
+                  args.proye,
+                  args.ci_o_cr,
+                  args.op_ci
                   )
 
 if __name__=='__main__':

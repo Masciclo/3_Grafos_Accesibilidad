@@ -104,6 +104,24 @@ def download_osm(area):
     # Return the result
     return(filter_lines)
 
+def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
+    filters = []
+    
+    if arg_proye == 0:
+        filters.append('proye = 0') 
+    if arg_ci_o_cr == 0:
+        filters.append('ci_o_cr = 0')
+    if arg_op_ci == 0:
+        filters.append('op_ci = 0')
+
+    if not filters:
+        return None
+
+    filters_string = " AND ".join(filters)
+
+    return filters_string
+
+
 def execute_query_with_params(conn, query, params):
     '''
     Description: Executes a query on a connection with given parameters
