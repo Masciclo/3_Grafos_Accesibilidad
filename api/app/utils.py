@@ -40,13 +40,13 @@ def read_csv_to_df(file_path):
     return df
 
 
-def df_to_postgres(df, table_name,geom_type, user, password, host, port, database_name):
+def df_to_postgres(df, table_name,geom_type, srid, user, password, host, port, database_name):
     '''
     Description: upload a df object into a database
     Input: df object (from read_csv_to_df function) and a name for the table   
     '''
     # Convert geometry to WKTElement
-    df['geometry'] = df['geometry'].apply(lambda geom: WKTElement(geom, srid=32719))
+    df['geometry'] = df['geometry'].apply(lambda geom: WKTElement(geom, srid=srid))
 
     # Create SQL Alchemy Engine
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
@@ -57,7 +57,7 @@ def df_to_postgres(df, table_name,geom_type, user, password, host, port, databas
         engine, 
         if_exists='replace', 
         index=False, 
-        dtype={'geometry': Geometry(geom_type, srid=32719)}
+        dtype={'geometry': Geometry(geom_type, srid=srid)}
     )
 
     #Create spatial Index 
@@ -70,7 +70,7 @@ def df_to_postgres(df, table_name,geom_type, user, password, host, port, databas
     conn = create_conn(database_name,host,port,user,password)
     params = ()
     # execute query
-    execute_query_with_params(conn, query, params)
+    execute_query(conn, query, params)
 
     print('Table '+table_name+' imported')
 
@@ -128,13 +128,13 @@ def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
     return filters_string
 
 
-def execute_query_with_params(conn, query, params):
+def execute_query(conn, query):
     '''
     Description: Executes a query on a connection with given parameters
     Input: conn - connection object, query - SQL query string, params - tuple of parameters
     '''
     with conn.cursor() as cursor:
-        cursor.execute(query, params)
+        cursor.execute(query)
         conn.commit()
 
 
@@ -155,7 +155,7 @@ def check_table_existence(conn, table_name):
         return cursor.fetchone()[0]
 
 ##Revisar location
-def handle_path_argument(path_arg, base_file_path, table_name, location, location_input, geom_type, user, password, host, port, database_name):
+def handle_path_argument(path_arg, base_file_path, table_name, location_input, geom_type, srid, user, password, host, port, database_name):
     '''
     Description: This function handles path input argument in three different ways based on its value
     Input: path_arg - input argument which can be None, 'osm', or 'string_path'
@@ -176,7 +176,7 @@ def handle_path_argument(path_arg, base_file_path, table_name, location, locatio
             print(f'Table {table_name} already exists, skipping import.')
         else:
             df_osm = read_csv_to_df(base_file_path)
-            df_to_postgres(df_osm, table_name, geom_type, 
+            df_to_postgres(df_osm, table_name, geom_type, srid,
                             user=user, password=password, host=host, 
                             port=port, database_name=database_name)
             print(f'Table {table_name} is loaded into database')
@@ -185,12 +185,12 @@ def handle_path_argument(path_arg, base_file_path, table_name, location, locatio
     elif path_arg == 'osm':
         # download_osm function should return the path to the downloaded file
         df_osm = download_osm(location_input)
-        df_to_postgres(df_osm, table_name, geom_type, 
+        df_to_postgres(df_osm, table_name, geom_type, srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
 
     else:  # path_arg is a string path
         df_osm = read_csv_to_df(path_arg)
-        df_to_postgres(df_osm, table_name, geom_type, 
+        df_to_postgres(df_osm, table_name, geom_type, srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)

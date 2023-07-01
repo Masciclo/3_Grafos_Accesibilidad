@@ -10,7 +10,7 @@ TODO:
 -- [Pedro] testear osm para vias principales, ver que hacer con otros tipos de caminos 
 -- [Pedro] modificar flujo de main
     -- [ignacio] modificar querys 
-    -- [Pedro] inhibir osm antes de unir con ciclos
--- [Pedro/ignacio] parametrizar srid python/sql srid
+    -- [Pedro] tester nuevo orden de pipeline
+-- [Pedro/ignacio] testear parametro srid
 
 -- [] agregar srid a hexágonos

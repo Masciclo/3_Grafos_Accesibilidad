@@ -57,16 +57,14 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     - Input: path of csv file, postgres table name of result table, 
     list of queries (str).
     '''
-    print(f'the input arg is {osm_input}')
-    print(f'and the type is {type(osm_input)}')
 
     #create an abbreviated name for handle the area
-    location = utils.create_abbreviation(location_input)
+    location_prefix = utils.create_abbreviation(location_input)
 
-    osm_table_name = f'{location}_osm'
-    ciclo_table_name = f'{location}_ciclos'
-    inhibitor_table_name = f'{location}_inhibitor'
-    desinhibitor_table_name = f'{location}_desinhibitor'
+    osm_table_name = f'{location_prefix}_osm'
+    ciclo_table_name = f'{location_prefix}_ciclos'
+    inhibitor_table_name = f'{location_prefix}_inhibitor'
+    desinhibitor_table_name = f'{location_prefix}_desinhibitor'
 
     # path of base files of Santiago
     osm_base_path = os.path.join(data_base_path,
@@ -84,6 +82,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                osm_table_name,
                                location_input,
                                'MULTILINESTRING',
+                               srid,
                                USER,
                                PASSWORD,
                                HOST,
@@ -96,6 +95,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                ciclo_table_name,
                                location_input,
                                'MULTILINESTRING',
+                               srid,
                                USER,
                                PASSWORD,
                                HOST,
@@ -108,6 +108,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                inhibitor_table_name,
                                location_input,
                                'MULTILINESTRING',
+                               srid,
                                USER,
                                PASSWORD,
                                HOST,
@@ -120,16 +121,105 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                desinhibitor_table_name,
                                location_input,
                                'MULTILINESTRING',
+                               srid,
                                USER,
                                PASSWORD,
                                HOST,
                                PORT,
                                DATABASE_NAME)
-    
+
+
+# inhibit network or not 
+    if inhibit:
+        # Define path to sql query and table names
+        sql_file_path_buffer = os.path.join(sql_base_path,
+                                'create_buffer.sql')
+        inhibitor_input_name = inhibitor_table_name
+        inhibitor_result_name = f'{location_prefix}_inhib_{buffer_inhib}_buff'
+        query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
+        # Format sql query
+        query = query_template_buffer.format(result_name=inhibitor_result_name, 
+                                  table_name=inhibitor_input_name, 
+                                  metros=buffer_inhib
+                                  ) 
+        
+                                  
+        # Execute query formated
+        print('Creating inhibitor buffer')
+        utils.execute_query(conn, query)
+        
+        
+        # CASE: inhib and deshinib
+        if disinhit:
+            desinhibitor_input_name = desinhibitor_table_name
+            desinhibitor_result_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}_buff'
+            # Format sql query
+            query = query_template_buffer.format(result_name=desinhibitor_result_name, 
+                                      table_name=desinhibitor_input_name, 
+                                      metros=buffer_desinhib
+                                      ) 
+
+            # Execute query formated
+            print('Creating desinhibitor buffer')
+            utils.execute_query(conn, query)
+
+            # Creating final buffer
+            sql_file_path_final_buffer = os.path.join(sql_base_path,
+                                'buffer_difference.sql')
+            buffer_final_input_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}_diff'
+            query_template_final_buffer = utils.read_sql_file(sql_file_path_final_buffer)
+            # Format sql query
+            query = query_template_final_buffer.format(result_name=buffer_final_input_name, 
+                                      buffer_inhibitor=inhibitor_result_name, 
+                                      buffer_desinhibitor=desinhibitor_result_name
+                                      ) 
+
+            # Execute query formated
+            print('Calculating buffer difference')
+            utils.execute_query(conn, query)
+
+            # delete_line_segments_in_polygon
+            sql_file_path_inhibit_network = os.path.join(sql_base_path,
+                                        'create_inhibited_network.sql')
+            scenery_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}_final'
+            query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
+            # Format sql query
+            query = query_template_inhibit_network.format(result_name=scenery_name, 
+                                      network_name=osm_table_name, 
+                                      buffer_name=buffer_final_input_name
+                                      )
+            # Execute query formated
+            print('Inhibiting the network')
+            utils.execute_query(conn, query)
+        # Case: Just ihbin
+        else:
+            print('desinhibitor are not processing')
+
+            sql_file_path_inhibit_network = os.path.join(sql_base_path,
+                                        'create_inhibited_network.sql')
+            scenery_name = f'{location_prefix}_inhib_{buffer_inhib}_final'
+            query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
+            # Format sql query
+            query = query_template_inhibit_network.format(result_name=scenery_name, 
+                                      network_name=osm_table_name, 
+                                      buffer_name=inhibitor_result_name
+                                      )
+            # Execute query formated
+            print('Inhibiting the network')
+            utils.execute_query(conn, query)
+
+            #final_table_name = inhibitor_result_name
+
+
+    #CASE: don't inhib or desinhib
+    else:
+        print('Not inhibition applied')
+        scenery_name = osm_table_name   
+            #final_table_name = inhibitor_result_name
     
     
     # Merge ciclo and vial network
-    full_network_name = f'{location}_full_network'
+    full_network_name = f'{scenery_name}_full_network'
     
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
@@ -145,14 +235,13 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(result_name=full_network_name, 
                                   ciclo=ciclo_table_name, 
-                                  osm=osm_table_name,
+                                  osm=scenery_name,
                                   filters=where_clause)
 
 
     # Execute query to create full network
     print('Creating intermodal network')
-    params = ()
-    utils.execute_query_with_params(conn, query, params)
+    utils.execute_query(conn, query)
     
     # Create Spatial index for the full network
     sql_file_path = os.path.join(sql_base_path,
@@ -161,88 +250,6 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query = query_template.format(layer_name=full_network_name, 
                                   schema_name='public')
 
-    # inhibit network or not 
-    if inhibit:
-        # Define path to sql query and table names
-        sql_file_path_buffer = os.path.join(sql_base_path,
-                                'create_buffer.sql')
-        inhibitor_input_name = inhibitor_table_name
-        inhibitor_result_name = f'{location}_network_inhib_{buffer_inhib}'
-        query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
-        # Format sql query
-        query = query_template_buffer.format(result_name=inhibitor_result_name, 
-                                  table_name=inhibitor_input_name, 
-                                  metros=buffer_inhib
-                                  ) 
-                                  
-        # Execute query formated
-        print('Creating inhibitor buffer')
-        utils.execute_query_with_params(conn, query, params)
-        # Use Desinhibitor or not
-        if disinhit:
-            sql_file_path_buffer = os.path.join(sql_base_path,
-                                'create_buffer.sql')
-            desinhibitor_input_name = desinhibitor_table_name
-            desinhibitor_result_name = f'{location}_network_desinhib'+f'_{buffer_inhib}'
-            query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
-            # Format sql query
-            query = query_template_buffer.format(result_name=desinhibitor_result_name, 
-                                      table_name=desinhibitor_input_name, 
-                                      metros=buffer_desinhib
-                                      ) 
-
-            # Execute query formated
-            print('Creating desinhibitor buffer')
-            utils.execute_query_with_params(conn, query, params)
-
-            # Creating final buffer
-            sql_file_path_final_buffer = os.path.join(sql_base_path,
-                                'buffer_difference.sql')
-            buffer_final_input_name = f'{location}_final_buffer'
-            query_template_final_buffer = utils.read_sql_file(sql_file_path_final_buffer)
-            # Format sql query
-            query = query_template_final_buffer.format(result_name=buffer_final_input_name, 
-                                      buffer_inhibitor=inhibitor_result_name, 
-                                      buffer_desinhibitor=desinhibitor_result_name
-                                      ) 
-
-            # Execute query formated
-            print('Calculating buffer difference')
-            utils.execute_query_with_params(conn, query, params)
-
-            # delete_line_segments_in_polygon
-            sql_file_path_inhibit_network = os.path.join(sql_base_path,
-                                        'create_inhibited_network.sql')
-            scenery_name = f'{location}_inhibited'
-            query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
-            # Format sql query
-            query = query_template_inhibit_network.format(result_name=scenery_name, 
-                                      network_name=full_network_name, 
-                                      buffer_name=buffer_final_input_name
-                                      )
-            # Execute query formated
-            print('Inhibiting the network')
-            utils.execute_query_with_params(conn, query, params)
-
-        else:
-            print('desinhibitor are not processing')
-
-            sql_file_path_inhibit_network = os.path.join(sql_base_path,
-                                        'create_inhibited_network.sql')
-            scenery_name = f'{location}_inhibited'
-            query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
-            # Format sql query
-            query = query_template_inhibit_network.format(result_name=scenery_name, 
-                                      network_name=full_network_name, 
-                                      buffer_name=inhibitor_result_name
-                                      )
-            # Execute query formated
-            print('Inhibiting the network')
-            utils.execute_query_with_params(conn, query, params)
-
-    else:
-        print('Not inhibition applied')
-        scenery_name = full_network_name #f'{location}_network'
 
     # Create and clean the topology
     topology_table_name = scenery_name+'_topo'
@@ -253,11 +260,10 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(topo=topology_table_name,
-                                  srid=32719,
+                                  srid=srid,
                                   table=scenery_name)
-    print('Generando Topología')                      
-    params = ()
-    utils.execute_query_with_params(conn, query, params)
+    print('Generando Topología')
+    utils.execute_query(conn, query)
 
     # Calculate Components
     sql_file_path = os.path.join(sql_base_path,
@@ -268,9 +274,8 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(topo=topology_table_name,
                                   table_name=components_table_name)
-    print('Calculando componentes')                      
-    params = ()
-    utils.execute_query_with_params(conn, query, params)
+    print('Calculando componentes')
+    utils.execute_query(conn, query)
 
     # Calculate Betweenness centrality
 
