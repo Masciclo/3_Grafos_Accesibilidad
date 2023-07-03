@@ -11,6 +11,9 @@ SET impedance = CASE
     ELSE 1
 END;
 
+-- If not exists, create a new schema called buffers
+CREATE SCHEMA IF NOT EXISTS buffers;
+
 --Create buffer for each type of highway
 CREATE TEMP TABLE primary_buffer AS
 SELECT st_union(ST_Buffer(geometry, {dist_buffer})) AS geometry, impedance
@@ -51,7 +54,7 @@ FROM secondary_buffer
 WHERE ST_Intersects(tertiary_buffer.geometry, secondary_buffer.geometry);
 
 -- create final buffer
-CREATE TABLE {result_table} AS 
+CREATE TABLE buffers.{result_table} AS 
 SELECT * FROM primary_buffer
 UNION ALL
 SELECT * FROM secondary_buffer
@@ -60,4 +63,4 @@ UNION ALL
 SELECT * FROM tertiary_buffer
 WHERE geometry IS NOT NULL;
 
-CREATE INDEX {result_table}_gix ON {result_table} USING GIST (geometry);
+CREATE INDEX {result_table}_gix ON buffers.{result_table} USING GIST (geometry);
