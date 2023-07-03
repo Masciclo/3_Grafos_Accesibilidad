@@ -46,15 +46,19 @@ docker exec -it grafos-accesibilidad_ciclo-py_1 python main.py \
 
 # execute inside the container
 python main.py \
---osm_input='' \
---ciclo_input='' \
---location='santiago' \
+--osm_input='osm' \
+--ciclo_input='data/calidad_cliped.geojson' \
+--location='Santiago, Chile' \
+--srid=32719 \
 --inhibit=1 \
---inhibitor_input='data/highways.geojson' \
+--inhibitor_input='osm' \
 --buffer_inhibidores=15 \
 --disinhit=1 \
 --disinhitor_input='data/calidad_cliped.geojson' \
---buffer_disinhibitor=25 
+--buffer_disinhibitor=25 \
+--proye= \
+--ci_o_cr= \
+--op_ci= \
 
 
 #restart database

@@ -13,21 +13,21 @@ END;
 
 --Create buffer for each type of highway
 CREATE TEMP TABLE primary_buffer AS
-SELECT st_union(ST_Buffer(geometry, {buffer_inhib})) AS geometry, impedance
+SELECT st_union(ST_Buffer(geometry, {dist_buffer})) AS geometry, impedance
 FROM {table_name}
 where highway = 'primary'
 group by impedance;
 CREATE INDEX primary_buffer_gix ON primary_buffer USING GIST (geometry);
 
 CREATE TEMP TABLE secondary_buffer AS
-SELECT st_union(ST_Buffer(geometry, {buffer_inhib})) AS geometry, impedance
+SELECT st_union(ST_Buffer(geometry, {dist_buffer})) AS geometry, impedance
 FROM {table_name}
 where highway = 'secondary'
 group by impedance;
 CREATE INDEX secondary_buffer_gix ON secondary_buffer USING GIST (geometry);
 
 CREATE TEMP TABLE tertiary_buffer AS
-SELECT st_union(ST_Buffer(geometry, {buffer_inhib})) AS geometry, impedance
+SELECT st_union(ST_Buffer(geometry, {dist_buffer})) AS geometry, impedance
 FROM {table_name}
 where highway = 'tertiary'
 group by impedance;

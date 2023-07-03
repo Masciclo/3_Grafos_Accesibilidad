@@ -45,6 +45,9 @@ def df_to_postgres(df, table_name,geom_type, srid, user, password, host, port, d
     Description: upload a df object into a database
     Input: df object (from read_csv_to_df function) and a name for the table   
     '''
+    # ensure integer
+    srid = int(srid)
+
     # Convert geometry to WKTElement
     df['geometry'] = df['geometry'].apply(lambda geom: WKTElement(geom, srid=srid))
 
@@ -68,9 +71,8 @@ def df_to_postgres(df, table_name,geom_type, srid, user, password, host, port, d
                                 schema_name='public')
     # create connection
     conn = create_conn(database_name,host,port,user,password)
-    params = ()
     # execute query
-    execute_query(conn, query, params)
+    execute_query(conn, query)
 
     print('Table '+table_name+' imported')
 
@@ -87,11 +89,11 @@ def read_sql_file(file_path):
 
 def create_abbreviation(area):
     words = area.split(", ")
-    abbreviation = "".join([word[:4].upper() for word in words])
+    abbreviation = "".join([word[:4].lower() for word in words])
     return abbreviation
 
 
-def download_osm(area):
+def download_osm(area, srid):
     # Download data from OSM
     graph = ox.graph_from_place(area, network_type='all')
     edges = ox.graph_to_gdfs(graph, nodes=False, edges=True)
@@ -107,8 +109,12 @@ def download_osm(area):
     
     filter_lines = lines[lines['highway'].isin(usable_highway)]
 
+    # Reproject to the specified SRID
+    filter_lines = filter_lines.to_crs(epsg=srid)
+
     # Return the result
-    return(filter_lines)
+    return filter_lines
+
 
 def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
     filters = []
@@ -176,7 +182,7 @@ def handle_path_argument(path_arg, base_file_path, table_name, location_input, g
             print(f'Table {table_name} already exists, skipping import.')
         else:
             df_osm = read_csv_to_df(base_file_path)
-            df_to_postgres(df_osm, table_name, geom_type, srid,
+            df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                             user=user, password=password, host=host, 
                             port=port, database_name=database_name)
             print(f'Table {table_name} is loaded into database')
@@ -184,13 +190,15 @@ def handle_path_argument(path_arg, base_file_path, table_name, location_input, g
     
     elif path_arg == 'osm':
         # download_osm function should return the path to the downloaded file
-        df_osm = download_osm(location_input)
-        df_to_postgres(df_osm, table_name, geom_type, srid,
+        df_osm = download_osm(location_input, srid)
+        df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
+        print('downloading from osm and uploading to db')
 
     else:  # path_arg is a string path
         df_osm = read_csv_to_df(path_arg)
-        df_to_postgres(df_osm, table_name, geom_type, srid,
+        print('uploading from path argument to db')
+        df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)

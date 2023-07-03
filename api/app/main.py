@@ -81,7 +81,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                osm_base_path,
                                osm_table_name,
                                location_input,
-                               'MULTILINESTRING',
+                               'LineString',
                                srid,
                                USER,
                                PASSWORD,
@@ -107,7 +107,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                inhibitor_base_path,
                                inhibitor_table_name,
                                location_input,
-                               'MULTILINESTRING',
+                               'LineString',
                                srid,
                                USER,
                                PASSWORD,
@@ -138,9 +138,9 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         impedance_result_name = f'{location_prefix}_impedance_{buffer_inhib}_buff'
         query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
         # Format sql query
-        query = query_template_buffer.format(result_name=impedance_result_name, 
+        query = query_template_buffer.format(result_table=impedance_result_name, 
                                   table_name=inhibitor_input_name, 
-                                  metros=buffer_inhib
+                                  dist_buffer=buffer_inhib
                                   ) 
         
         # Define path to sql query and table names
@@ -150,9 +150,9 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         inhibitor_result_name = f'{location_prefix}_inhib_{buffer_inhib}_buff'
         query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
         # Format sql query
-        query = query_template_buffer.format(result_name=inhibitor_result_name, 
+        query = query_template_buffer.format(result_table=inhibitor_result_name, 
                                   table_name=inhibitor_input_name, 
-                                  metros=buffer_inhib
+                                  dist_buffer=buffer_inhib
                                   ) 
         
                                   
@@ -166,9 +166,9 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
             desinhibitor_input_name = desinhibitor_table_name
             desinhibitor_result_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}_buff'
             # Format sql query
-            query = query_template_buffer.format(result_name=desinhibitor_result_name, 
+            query = query_template_buffer.format(result_table=desinhibitor_result_name, 
                                       table_name=desinhibitor_input_name, 
-                                      metros=buffer_desinhib
+                                      dist_buffer=buffer_desinhib
                                       ) 
 
             # Execute query formated

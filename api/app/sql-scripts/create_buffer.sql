@@ -5,17 +5,17 @@ CREATE SCHEMA IF NOT EXISTS buffers;
 DO
 $$
 BEGIN
-    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'buffers' AND tablename = '{result_name}') THEN
+    IF NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'buffers' AND tablename = '{result_table}') THEN
         -- Si metros no es igual a 0, crear la tabla de buffers y su correspondiente índice
-        IF {metros} != 0 THEN
-            CREATE TABLE buffers.{result_name} AS (
-                SELECT st_union(ST_BUFFER(geometry,{metros})) as geometry FROM {table_name}
+        IF {dist_buffer} != 0 THEN
+            CREATE TABLE buffers.{result_table} AS (
+                SELECT st_union(ST_BUFFER(geometry,{dist_buffer})) as geometry FROM {table_name}
             );
-            CREATE INDEX {result_name}_geom_idx ON buffers.{result_name} USING GIST (geometry);
+            CREATE INDEX {result_table}_geom_idx ON buffers.{result_table} USING GIST (geometry);
         END IF;
     ELSE
         -- Si la tabla ya existe, crea el índice si no existe
-        CREATE INDEX IF NOT EXISTS {result_name}_geom_idx ON buffers.{result_name} USING GIST (geometry);
+        CREATE INDEX IF NOT EXISTS {result_table}_geom_idx ON buffers.{result_table} USING GIST (geometry);
     END IF;
 END
 $$;
