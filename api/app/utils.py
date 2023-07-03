@@ -203,7 +203,7 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
         df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
-        print('downloading from osm and uploading to db')
+        print(f'downloading from osm and uploading to db as {table_name}')
 
     else:  # path_arg is a string path
         df_osm = read_csv_to_df(path_arg)

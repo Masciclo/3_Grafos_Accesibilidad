@@ -148,12 +148,11 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         # Define path to sql query and table names
         sql_file_path_buffer = os.path.join(sql_base_path,
                                 'create_impedance_buffers.sql')
-        inhibitor_input_name = inhibitor_table_name
         impedance_result_name = f'{location_prefix}_impedance_{buffer_inhib}_buff'
         query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
         # Format sql query
         query = query_template_buffer.format(result_table=impedance_result_name, 
-                                  table_name=inhibitor_input_name, 
+                                  table_name=inhibitor_table_name, 
                                   dist_buffer=buffer_inhib
                                   ) 
         # Execute query formated
@@ -164,12 +163,11 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         # Define path to sql query and table names
         sql_file_path_buffer = os.path.join(sql_base_path,
                                 'create_buffer.sql')
-        inhibitor_input_name = inhibitor_table_name
         inhibitor_result_name = f'{location_prefix}_inhib_{buffer_inhib}_buff'
         query_template_buffer = utils.read_sql_file(sql_file_path_buffer)
         # Format sql query
         query = query_template_buffer.format(result_table=inhibitor_result_name, 
-                                  table_name=inhibitor_input_name, 
+                                  table_name=inhibitor_table_name, 
                                   dist_buffer=buffer_inhib
                                   ) 
         
@@ -284,6 +282,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(layer_name=full_network_name, 
                                   schema_name='public')
+  
   
     # Create and clean the topology for inhibited network (impedance =< 1)
     component_topology_table_name = scenery_name+'_component_topo'
