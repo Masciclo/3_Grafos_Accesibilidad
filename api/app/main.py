@@ -267,20 +267,18 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query = query_template.format(layer_name=full_network_name, 
                                   schema_name='public')
   
-    ###################
-
     # Create and clean the topology for inhibited network (impedance =< 1)
-    topology_table_name = scenery_name+'_topo'
+    component_topology_table_name = scenery_name+'_component_topo'
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
-                                'create_clean_topology.sql')
+                                'create_component_topology.sql')
 
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
-    query = query_template.format(topo=topology_table_name,
+    query = query_template.format(result_name=component_topology_table_name,
                                   srid=srid,
                                   table=scenery_name)
-    print('Generando Topología')
+    print('Creating components topology')
     utils.execute_query(conn, query)
 
     # Calculate Components
@@ -290,24 +288,24 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     # Read template query and add parameters
     components_table_name = scenery_name+'_components'                           
     query_template = utils.read_sql_file(sql_file_path)
-    query = query_template.format(topo=topology_table_name,
+    query = query_template.format(topo=component_topology_table_name,
                                   table_name=components_table_name)
-    print('Calculando componentes')
+    print('Calculating components')
     utils.execute_query(conn, query)
 
     # Calculate Accessibility
     # Create and clean the topology for all network (all impedance) 
-    topology_table_name = scenery_name+'_topo'
+    access_topology_table_name = scenery_name+'_access_topo'
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
-                                'create_clean_topology.sql')
+                                'create_access_topology.sql')
 
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
-    query = query_template.format(topo=topology_table_name,
+    query = query_template.format(topo=access_topology_table_name,
                                   srid=srid,
                                   table=scenery_name)
-    print('Generando Topología')
+    print('Creating accessibility topology')
     utils.execute_query(conn, query)
     # Calculate Closeness
 

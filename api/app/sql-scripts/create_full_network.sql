@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS {table_name}_full_network;
+DROP TABLE IF EXISTS {result_name};
 
-CREATE TABLE {table_name}_full_network AS 
+CREATE TABLE {result_name} AS 
 SELECT
 	a.geometry as geometry,
 	0.8 as impedance 
@@ -12,12 +12,12 @@ SELECT
 	b.geometry as geometry,
 	impedance as impedance
 FROM
-	{inhibited_network} AS b
+	{osm} AS b
 WHERE
 	ST_GeometryType(geometry) IN ('ST_LineString', 'ST_MultiLineString');
 
-ALTER TABLE {table_name}_full_network ADD COLUMN id SERIAL PRIMARY KEY;
+ALTER TABLE {result_name} ADD COLUMN id SERIAL PRIMARY KEY;
 
 CREATE INDEX IF NOT EXISTS geom_idx 
-ON {table_name}_full_network
+ON {result_name}
 USING GIST (geometry);
