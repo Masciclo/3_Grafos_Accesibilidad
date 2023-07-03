@@ -9,7 +9,8 @@ ON buffers.{inhib_name} USING GIST(geometry);
 
 CREATE TABLE IF NOT EXISTS buffers.{impedance_name} AS 
 SELECT 
-    ST_Difference(bi.geometry, bd.geometry) AS geometry 
+    ST_Difference(bi.geometry, bd.geometry) AS geometry
+    bi.impedance as impedance 
 FROM buffers.{buffer_impedance} bi, 
     buffers.{buffer_desinhibitor} bd; 
 
