@@ -5,23 +5,25 @@ SELECT
     COALESCE(b.impedance, a.impedance) AS impedance
 FROM 
     {network_table} a
-    LEFT JOIN {impedance_buffer} b ON ST_Intersects(a.geometry, b.geometry);
+    LEFT JOIN buffers.{impedance_buffer} b 
+    ON ST_Intersects(a.geometry, b.geometry);
+
 -- Create spatial index
 CREATE INDEX network_with_impedance_gix ON network_with_impedance USING GIST (geometry);
 
-drop table if EXISTS {network_without_impedance};
-create table {network_without_impedance} AS
+drop table if EXISTS network_without_impedance;
+create TEMP table network_without_impedance AS
 select
 	st_difference(a.geometry,b.geometry),
 	1 as impedance
 FROM
 	{network_table} a,
-	{inhib_buffer} b;
+	buffers.{inhib_buffer} b;
 -- Create spatial index
-CREATE INDEX network_with_impedance_gix ON network_with_impedance USING GIST (geometry);
+CREATE INDEX IF NOT EXISTS network_with_impedance_gix ON network_with_impedance USING GIST (geometry);
 
 DROP TABLE IF EXISTS {result_name};
 CREATE TABLE {result_name} AS
 SELECT * FROM network_with_impedance
 UNION ALL
-SELECT * FROM {network_without_impedance};
+SELECT * FROM network_without_impedance;

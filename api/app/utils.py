@@ -93,27 +93,36 @@ def create_abbreviation(area):
     return abbreviation
 
 
-def download_osm(area, srid):
+def download_osm(area, srid, type_network):
     # Download data from OSM
     graph = ox.graph_from_place(area, network_type='all')
     edges = ox.graph_to_gdfs(graph, nodes=False, edges=True)
-
-    # Filter LineStrings
-    lines = edges[edges['geometry'].geom_type == 'LineString']
-
-    # Filter selected highways
-    usable_highway = ['residential',
-                      'primary',
-                      'secondary',
-                      'tertiary']
+    nodes = ox.graph_to_gdfs(graph, nodes=True, edges=False)  # new line: get the nodes
     
-    filter_lines = lines[lines['highway'].isin(usable_highway)]
+    if type_network == 'deshinibitor':
+        usable = ['traffic_signals']
+        # Filter Point geometries
+        features = nodes[nodes['highway'].isin(usable)]
+    else:
+        # Filter LineStrings
+        lines = edges[edges['geometry'].geom_type == 'LineString']
 
+        # Filter selected highways
+        if type_network == 'osm':
+            usable = ['residential', 'primary', 'secondary', 'tertiary']
+        elif type_network == 'ciclo':
+            usable = ['bike']
+        else:
+            usable = ['primary', 'secondary', 'tertiary']
+
+        features = lines[lines['highway'].isin(usable)]
+        
     # Reproject to the specified SRID
-    filter_lines = filter_lines.to_crs(epsg=srid)
+    features = features.to_crs(epsg=srid)
 
     # Return the result
-    return filter_lines
+    return features
+
 
 
 def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
@@ -161,7 +170,7 @@ def check_table_existence(conn, table_name):
         return cursor.fetchone()[0]
 
 ##Revisar location
-def handle_path_argument(path_arg, base_file_path, table_name, location_input, geom_type, srid, user, password, host, port, database_name):
+def handle_path_argument(type_network, path_arg, base_file_path, table_name, location_input, geom_type, srid, user, password, host, port, database_name):
     '''
     Description: This function handles path input argument in three different ways based on its value
     Input: path_arg - input argument which can be None, 'osm', or 'string_path'
@@ -190,7 +199,7 @@ def handle_path_argument(path_arg, base_file_path, table_name, location_input, g
     
     elif path_arg == 'osm':
         # download_osm function should return the path to the downloaded file
-        df_osm = download_osm(location_input, srid)
+        df_osm = download_osm(location_input, srid, type_network)
         df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)

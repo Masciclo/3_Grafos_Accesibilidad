@@ -6,7 +6,7 @@ SELECT
 	0.8 as impedance 
 FROM
 	{ciclo} AS a
-{filters};
+{filters}
 UNION ALL
 SELECT
 	b.geometry as geometry,

@@ -54,7 +54,7 @@ python main.py \
 --inhibitor_input='osm' \
 --buffer_inhibidores=15 \
 --disinhit=1 \
---disinhitor_input='data/calidad_cliped.geojson' \
+--disinhitor_input='osm' \
 --buffer_disinhibitor=25 \
 --proye= \
 --ci_o_cr= \

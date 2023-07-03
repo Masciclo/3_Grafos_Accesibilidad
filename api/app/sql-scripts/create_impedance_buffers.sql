@@ -53,6 +53,9 @@ SET geometry = ST_Difference(tertiary_buffer.geometry, secondary_buffer.geometry
 FROM secondary_buffer
 WHERE ST_Intersects(tertiary_buffer.geometry, secondary_buffer.geometry);
 
+
+DROP TABLE IF EXISTS buffers.{result_table};
+
 -- create final buffer
 CREATE TABLE buffers.{result_table} AS 
 SELECT * FROM primary_buffer
