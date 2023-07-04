@@ -7,7 +7,7 @@ from geoalchemy2 import Geometry, WKTElement
 from shapely import wkt
 import shapely.geometry.base
 import osmnx as ox
-import geojson
+import geojson 
 import json
 from shapely.geometry import Polygon
 from h3 import h3
@@ -114,8 +114,8 @@ def download_osm(area, srid, type_network):
         # Filter selected highways
         if type_network == 'osm':
             usable = ['residential', 'primary', 'secondary', 'tertiary']
-        elif type_network == 'ciclo':
-            usable = ['bike']
+        elif type_network == 'bike':
+            usable = ['cycleway']
         else:
             usable = ['primary', 'secondary', 'tertiary']
 

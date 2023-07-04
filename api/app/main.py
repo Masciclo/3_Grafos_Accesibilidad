@@ -248,7 +248,6 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     else:
         print('Not inhibition applied')
         scenery_name = osm_table_name   
-            #final_table_name = inhibitor_result_name
     
     ####### AGREGAR OPCIÓN SIN CICLO ######
     # Merge ciclo and vial network
