@@ -312,15 +312,16 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     utils.execute_query(conn, query)
 
     # Calculate Accessibility
-    # Create and clean the topology for all network (all impedance) 
-    access_topology_table_name = scenery_name+'_access_topo'
+    #Create h3 polygons
+    utils.download_h3(full_network_name,srid,res,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
-                                'create_access_topology.sql')
+                                'calculate_accessibility.sql')
 
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
-    query = query_template.format(topo=access_topology_table_name,
+    query = query_template.format(h3_table_name=full_network_name+'_h3',
+                                  topo_name=topology_table_name,
                                   srid=srid,
                                   table=scenery_name)
     print('Creating accessibility topology')

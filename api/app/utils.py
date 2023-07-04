@@ -7,6 +7,10 @@ from geoalchemy2 import Geometry, WKTElement
 from shapely import wkt
 import shapely.geometry.base
 import osmnx as ox
+import geojson
+import json
+from shapely.geometry import Polygon
+from h3 import h3
 
 sql_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                     'sql-scripts')
@@ -123,7 +127,33 @@ def download_osm(area, srid, type_network):
     # Return the result
     return features
 
+def download_h3(table, srid, res, user, password, host, port, database_name):
+    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
+    sql = f'SELECT geometry from {table}'
+    df = gpd.read_postgis(sql,engine)
+    # Get bbox
+    west, south, east, north = ox.geocode_to_gdf(df).total_bounds
 
+    polygon_geojson = geojson.Feature(geometry=Polygon([(west, south), (east, south), (east, north), (west, north)]), properties={})
+    
+    # Create dict
+    polygon_dict = json.loads(geojson.dumps(polygon_geojson.geometry))
+
+    # Obtener los hexágonos H3 para el área
+    h3_hexagons = h3.polyfill(polygon_dict, res=res, geo_json_conformant=True)
+
+    # Crear la columna de geometría
+    geometry = [Polygon(h3.h3_to_geo_boundary(h, geo_json=True)) for h in h3_hexagons]
+
+    # Convertir a GeoDataFrame
+    h3_hexagons_gdf = gpd.GeoDataFrame(geometry=geometry, columns=['geometry'])
+
+    #Reproject to the specified SRID
+    h3_hexagons_gdf = h3_hexagons_gdf.to_crs(epsg=srid)
+
+    # Subir los datos a PostGIS
+    h3_hexagons_gdf.to_postgis(name=table+'_h3', con=engine, if_exists='replace')
+    print('Creating H3')
 
 def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
     filters = []
