@@ -100,7 +100,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     utils.execute_query(conn, query)
 
     # handle ciclo argument 
-    utils.handle_path_argument('osm',
+    utils.handle_path_argument('bike',
                                ciclo_input,
                                ciclo_base_path,
                                ciclo_table_name,
@@ -283,7 +283,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query = query_template.format(layer_name=full_network_name, 
                                   schema_name='public')
   
-  
+
     # Create and clean the topology for inhibited network (impedance =< 1)
     topology_table_name = scenery_name+'_topo'
     # Read SQL file and format query string
@@ -293,7 +293,8 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(topo=topology_table_name,
-                                  table=scenery_name)
+                                  table=full_network_name,
+                                  srid=srid)
     print('Creating topology')
     utils.execute_query(conn, query)
 
@@ -305,8 +306,8 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     components_table_name = scenery_name+'_components'                           
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(topo_name=topology_table_name,
-                                  result_name=components_table_name,
-                                  table_name=scenery_name)
+                                  result_table=components_table_name,
+                                  table_name=full_network_name)
     print('Calculating components')
     utils.execute_query(conn, query)
 

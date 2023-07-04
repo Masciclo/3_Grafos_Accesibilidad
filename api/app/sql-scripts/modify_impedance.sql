@@ -1,8 +1,8 @@
--- Add impedance field
-alter table {table_name}
-add column impedance float;
+-- Add impedance field if it does not already exist
+ALTER TABLE {table_name}
+ADD COLUMN IF NOT EXISTS impedance float;
 
--- impedance for each type of highway
+-- Update impedance for each type of highway
 UPDATE {table_name}
 SET impedance = CASE
     WHEN highway = 'primary' THEN 1
