@@ -96,7 +96,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_modify_impedance = utils.read_sql_file(path_modify_impedance)
     query = query_modify_impedance.format(table_name=osm_table_name)
     # Execute query formated
-    print('Creating impedance buffer')
+    print('modify impedance column')
     utils.execute_query(conn, query)
 
     # handle ciclo argument 
@@ -250,9 +250,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         scenery_name = osm_table_name   
     
     ####### AGREGAR OPCIÓN SIN CICLO ######
-    # Merge ciclo and vial network
-    full_network_name = f'{scenery_name}_full_network'
-    
+
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
                                 'create_full_network.sql')
@@ -261,7 +259,14 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     filters = utils.create_filters_string(proye, ci_o_cr,op_ci)
     
     # Add the WHERE clause only if there are filters to apply
+    # ex. proye = 0 AND ci_o_cr = 0
     where_clause = f"WHERE {filters}" if filters else ""
+
+    suffix_full_network = utils.create_suffix_string(proye, ci_o_cr,op_ci)
+    
+    # Merge ciclo and vial network
+    full_network_name = f'{scenery_name}_full_network_{suffix_full_network}'
+    
 
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
@@ -312,7 +317,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
 
     # Calculate Accessibility
     #Create h3 polygons
-    utils.download_h3(full_network_name,srid,res,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
+    utils.download_h3(full_network_name,srid,10,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
     # Read SQL file and format query string
     sql_file_path = os.path.join(sql_base_path,
                                 'calculate_accessibility.sql')

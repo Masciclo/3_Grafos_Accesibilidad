@@ -56,8 +56,8 @@ python main.py \
 --disinhit=0 \
 --disinhitor_input='' \
 --buffer_disinhibitor=25 \
---proye= \
---ci_o_cr= \
+--proye=0 \
+--ci_o_cr=0 \
 --op_ci= \
 
 

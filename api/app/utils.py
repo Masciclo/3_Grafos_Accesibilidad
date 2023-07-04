@@ -159,9 +159,9 @@ def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
     filters = []
     
     if arg_proye == 0:
-        filters.append('proye = 0') 
+        filters.append('proyect = 0') 
     if arg_ci_o_cr == 0:
-        filters.append('ci_o_cr = 0')
+        filters.append('"CI_O_CR" = 0')
     if arg_op_ci == 0:
         filters.append('op_ci = 0')
 
@@ -172,6 +172,22 @@ def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
 
     return filters_string
 
+def create_suffix_string(arg_proye, arg_ci_o_cr, arg_op_ci):
+    filters = []
+    
+    if arg_proye == 0:
+        filters.append('proye_0') 
+    if arg_ci_o_cr == 0:
+        filters.append('ci_o_cr_0')
+    if arg_op_ci == 0:
+        filters.append('op_ci_0')
+
+    if not filters:
+        return ''
+
+    filters_string = "_".join(filters)
+
+    return filters_string
 
 def execute_query(conn, query):
     '''
