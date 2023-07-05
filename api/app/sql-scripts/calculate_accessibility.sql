@@ -10,9 +10,9 @@ ADD COLUMN nearest_node_id INTEGER;
 UPDATE {h3_table_name} AS h
 SET nearest_node_id = 
 (
-    SELECT id FROM node_table AS n
-    WHERE ST_DWithin(h.centroid, n.geometry, {radius})
-    ORDER BY ST_Distance(h.centroid, n.geometry)
+    SELECT node_id FROM {node_table} AS n
+    WHERE ST_DWithin(h.centroid, n.geom, {radius})
+    ORDER BY ST_Distance(h.centroid, n.geom)
     LIMIT 1
 );
 
@@ -45,7 +45,7 @@ SET accessibility =
         SELECT cost FROM pgr_dijkstra(
         'SELECT id, source, target, cost FROM temp_table',
         h1.nearest_node_id,
-        ARRAY(SELECT nearest_node_id FROM stgo_osm_h3 WHERE nearest_node_id IS NOT NULL),
+        ARRAY(SELECT nearest_node_id FROM {h3_table_name} WHERE nearest_node_id IS NOT NULL),
         directed := false
         ) AS routes
     ) AS total_cost

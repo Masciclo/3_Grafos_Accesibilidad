@@ -212,7 +212,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
             # delete_line_segments_in_polygon
             sql_file_path_inhibit_network = os.path.join(sql_base_path,
                                         'create_inhibited_network.sql')
-            scenery_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}_final'
+            scenery_name = f'{location_prefix}_inh_{buffer_inhib}_desinh_{buffer_desinhib}_final'
             query_template_inhibit_network = utils.read_sql_file(sql_file_path_inhibit_network)
             # Format sql query
             query = query_template_inhibit_network.format(result_name=scenery_name, 
@@ -317,24 +317,27 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
 
     # Calculate Accessibility
     #Create h3 polygons
+    #parametrizar h3_level
     utils.download_h3(full_network_name,srid,10,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
     # Read SQL file and format query string
+
     sql_file_path = os.path.join(sql_base_path,
                                 'calculate_accessibility.sql')
+
+    #define node table
+    node_table_name = f'{topology_table_name}.node'
 
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(h3_table_name=full_network_name+'_h3',
                                   topo_name=topology_table_name,
+                                  radius = 200, #parametrizar
                                   srid=srid,
-                                  table=scenery_name)
+                                  table_name=full_network_name,
+                                  node_table=node_table_name)
+
     print('Creating accessibility topology')
     utils.execute_query(conn, query)
-    # Calculate Closeness
-
-    # stgo_inhib_0_desinhib_0_
-    # stgo_inhib_15_desinhib_25_proye_0)
-    
 
 
 def main():

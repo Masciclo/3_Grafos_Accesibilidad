@@ -129,31 +129,48 @@ def download_osm(area, srid, type_network):
 
 def download_h3(table, srid, res, user, password, host, port, database_name):
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
-    sql = f'SELECT geometry from {table}'
+    sql = f'SELECT geometry as geom from {table}'
     df = gpd.read_postgis(sql,engine)
+
+    # Set srid
+    df = df.to_crs(epsg=srid)
+
+    print(f"Number of df record: {len(df)}")
+
+    # Convert to EPSG:4326 for H3
+    df_4326 = df.to_crs(epsg=4326)
+
     # Get bbox
-    west, south, east, north = ox.geocode_to_gdf(df).total_bounds
+    west, south, east, north = df_4326.total_bounds
 
     polygon_geojson = geojson.Feature(geometry=Polygon([(west, south), (east, south), (east, north), (west, north)]), properties={})
-    
+
     # Create dict
     polygon_dict = json.loads(geojson.dumps(polygon_geojson.geometry))
 
-    # Obtener los hexágonos H3 para el área
+    # Obtain the H3 hexagons for the area
     h3_hexagons = h3.polyfill(polygon_dict, res=res, geo_json_conformant=True)
+    print(f"Number of H3 hexagons generated: {len(h3_hexagons)}")
 
-    # Crear la columna de geometría
+    # Create the geometry column
     geometry = [Polygon(h3.h3_to_geo_boundary(h, geo_json=True)) for h in h3_hexagons]
 
-    # Convertir a GeoDataFrame
+    # Convert to GeoDataFrame
     h3_hexagons_gdf = gpd.GeoDataFrame(geometry=geometry, columns=['geometry'])
 
-    #Reproject to the specified SRID
+    # Set the CRS for the GeoDataFrame
+    h3_hexagons_gdf.crs = "EPSG:4326"  # H3 works with EPSG:4326
+    
+    # Convert back to original CRS for storage
     h3_hexagons_gdf = h3_hexagons_gdf.to_crs(epsg=srid)
 
-    # Subir los datos a PostGIS
-    h3_hexagons_gdf.to_postgis(name=table+'_h3', con=engine, if_exists='replace')
-    print('Creating H3')
+    try:
+        h3_hexagons_gdf.to_postgis(name=table+'_h3', con=engine, if_exists='replace')
+        print('H3 data successfully written to PostGIS.')
+    except Exception as e:
+        print('An error occurred while writing H3 data to PostGIS:')
+        print(e) #exception
+
 
 def create_filters_string(arg_proye, arg_ci_o_cr, arg_op_ci):
     filters = []
