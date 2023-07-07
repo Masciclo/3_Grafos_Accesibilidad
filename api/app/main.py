@@ -265,7 +265,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     suffix_full_network = utils.create_suffix_string(proye, ci_o_cr,op_ci)
     
     # Merge ciclo and vial network
-    full_network_name = f'{scenery_name}_full_network_{suffix_full_network}'
+    full_network_name = f'{scenery_name}_full_network{suffix_full_network}'
     
 
     # Read template query and add parameters                                

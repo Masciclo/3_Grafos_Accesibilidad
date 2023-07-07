@@ -5,9 +5,9 @@ ADD COLUMN IF NOT EXISTS impedance float;
 -- impedance for each type of highway
 UPDATE {table_name}
 SET impedance = CASE
-    WHEN highway = 'primary' THEN 3
-    WHEN highway = 'secondary' THEN 2
-    WHEN highway = 'tertiary' THEN 1.5
+    WHEN highway = 'primary' THEN 10
+    WHEN highway = 'secondary' THEN 5
+    WHEN highway = 'tertiary' THEN 2
     ELSE 1
 END;
 

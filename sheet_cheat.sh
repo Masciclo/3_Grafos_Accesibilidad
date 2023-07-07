@@ -50,10 +50,10 @@ python main.py \
 --ciclo_input='data/calidad_cliped.geojson' \
 --location='Santiago, Chile' \
 --srid=32719 \
---inhibit=1 \
+--inhibit=0 \
 --inhibitor_input='' \
 --buffer_inhibidores=15 \
---disinhit=1 \
+--disinhit=0 \
 --disinhitor_input='' \
 --buffer_disinhibitor=25 \
 --proye= \

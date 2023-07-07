@@ -203,7 +203,7 @@ def create_suffix_string(arg_proye, arg_ci_o_cr, arg_op_ci):
         return ''
 
     filters_string = "_".join(filters)
-
+    filters_string = '_'+filters_string
     return filters_string
 
 def execute_query(conn, query):

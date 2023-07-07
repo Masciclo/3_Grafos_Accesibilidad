@@ -7,12 +7,14 @@ SET centroid = ST_Centroid(geometry);
 ALTER TABLE {h3_table_name} 
 ADD COLUMN nearest_node_id INTEGER;
 
+CREATE INDEX node_geom_idx ON {node_table} USING gist(geom);
+
 UPDATE {h3_table_name} AS h
 SET nearest_node_id = 
 (
     SELECT node_id FROM {node_table} AS n
     WHERE ST_DWithin(h.centroid, n.geom, {radius})
-    ORDER BY ST_Distance(h.centroid, n.geom)
+    ORDER BY h.centroid <-> n.geom ASC
     LIMIT 1
 );
 
