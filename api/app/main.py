@@ -318,9 +318,16 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     # Calculate Accessibility
     #Create h3 polygons
     #parametrizar h3_level
-    utils.download_h3(full_network_name,srid,10,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
+    utils.download_h3(osm_table_name,srid,10,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
+    
+    #Add ID to H3 Polygons
+    sql_file_path = os.path.join(sql_base_path,
+                                 'create_index.sql')
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(table_name = osm_table_name+'_h3')
+    utils.execute_query(conn, query)
+    
     # Read SQL file and format query string
-
     sql_file_path = os.path.join(sql_base_path,
                                 'calculate_accessibility.sql')
 
@@ -329,7 +336,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
 
     # Read template query and add parameters                                
     query_template = utils.read_sql_file(sql_file_path)
-    query = query_template.format(h3_table_name=full_network_name+'_h3',
+    query = query_template.format(h3_table_name=osm_table_name+'_h3',
                                   topo_name=topology_table_name,
                                   radius = 200, #parametrizar
                                   srid=srid,
@@ -338,6 +345,43 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
 
     print('Creating accessibility topology')
     utils.execute_query(conn, query)
+
+    # OSM lengths to Hexagons
+    # Read SQL file and format query string
+    sql_file_path = os.path.join(sql_base_path,
+                                'osm_data_to_h3.sql')
+    
+    #Read template query and add parameters
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(osm_table = osm_table_name,
+                                  h3_table = osm_table_name+'_h3')
+    print('Adding OSM lenghts to H3')
+    utils.execute_query(conn,query)
+
+    # Ciclo lenghts to Hexagons
+    # Read SQL file and format query string
+    sql_file_path = os.path.join(sql_base_path,
+                                 'ciclo_data_to_h3.sql')
+    
+    # Read template query and add parameters
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(ciclo_table = ciclo_table_name,
+                                  h3_table = osm_table_name+'_h3')
+    print('Adding Ciclo data to H3')
+    utils.execute_query(conn,query)
+
+    # Component result to Hexagons
+    # Read SQL file and format query string
+    sql_file_path = os.path.join(sql_base_path,
+                                 'components_data_to_h3.sql')
+    
+    # Read template query and add parameters
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(component_table = components_table_name,
+                                  h3_table = osm_table_name+'_h3',
+                                  result_table = full_network_name)
+    print('Adding component result to H3')
+    utils.execute_query(conn,query)
 
 
 def main():
