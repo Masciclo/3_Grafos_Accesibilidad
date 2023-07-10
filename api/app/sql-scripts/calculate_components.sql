@@ -22,7 +22,7 @@ left JOIN impedance_table AS it ON ed.edge_id = it.edge_data_id
 where impedance <= 1;
 	
 drop table if exists components_table;
-create table components_table as
+create temp table components_table as
 select * from pgr_connectedComponents(
     'SELECT id, source, target, len as cost FROM {result_table}'
 );
