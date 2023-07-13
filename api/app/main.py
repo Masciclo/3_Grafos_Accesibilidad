@@ -37,8 +37,8 @@ load_dotenv()
 DATABASE_NAME = os.getenv('DATABASE_NAME')
 HOST = os.getenv('HOST')
 PORT = os.getenv('PORT')
-USER = os.getenv('USER')
-PASSWORD = os.getenv('PASSWORD')
+USER = os.getenv('DB_USER')
+PASSWORD = os.getenv('DB_PASSWORD')
 
 # Connect to PostgreSQL
 conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
