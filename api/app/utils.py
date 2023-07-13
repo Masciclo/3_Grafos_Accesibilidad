@@ -262,11 +262,14 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
     
     elif path_arg == 'osm':
         # download_osm function should return the path to the downloaded file
+        print(f'downloading {location_input} from osm ')
         df_osm = download_osm(location_input, srid, type_network)
+        print('uploading to db as {table_name}')
         df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
-        print(f'downloading from osm and uploading to db as {table_name}')
+        print('{table_name} uploaded')
+        
 
     else:  # path_arg is a string path
         df_osm = read_csv_to_df(path_arg)
