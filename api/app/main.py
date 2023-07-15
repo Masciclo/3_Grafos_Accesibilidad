@@ -39,9 +39,13 @@ HOST = os.getenv('HOST')
 PORT = os.getenv('PORT')
 USER = os.getenv('DB_USER')
 PASSWORD = os.getenv('DB_PASSWORD')
+# other parameters
 H3_LEVEL = os.getenv('H3_LEVEL')
 RADIUS_ACCESS = os.getenv('RADIUS_ACCESS')
-
+HIGH_IMPEDANCE = os.getenv('HIGH_IMPEDANCE')
+MEDIUM_IMPEDANCE = os.getenv('MEDIUM_IMPEDANCE')
+LOW_IMPEDANCE = os.getenv('LOW_IMPEDANCE')
+ELSE_IMPEDANCE = os.getenv('ELSE_IMPEDANCE')
 
 # Connect to PostgreSQL
 conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
@@ -156,7 +160,11 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         # Format sql query
         query = query_template_buffer.format(result_table=impedance_result_name, 
                                   table_name=inhibitor_table_name, 
-                                  dist_buffer=buffer_inhib
+                                  dist_buffer=buffer_inhib,
+                                  high_impedance=HIGH_IMPEDANCE,
+                                  medium_impedance=MEDIUM_IMPEDANCE,
+                                  low_impedance=LOW_IMPEDANCE,
+                                  else_impedance=ELSE_IMPEDANCE,
                                   ) 
         # Execute query formated
         print('Creating impedance buffer')

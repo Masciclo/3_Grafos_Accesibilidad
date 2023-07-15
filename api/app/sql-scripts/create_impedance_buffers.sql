@@ -5,10 +5,10 @@ ADD COLUMN IF NOT EXISTS impedance float;
 -- impedance for each type of highway
 UPDATE {table_name}
 SET impedance = CASE
-    WHEN highway = 'primary' THEN 10
-    WHEN highway = 'secondary' THEN 5
-    WHEN highway = 'tertiary' THEN 2
-    ELSE 1
+    WHEN highway = 'primary' THEN {high_impedance} --10
+    WHEN highway = 'secondary' THEN {medium_impedance} --5
+    WHEN highway = 'tertiary' THEN {low_impedance} --2
+    ELSE {else_impedance}
 END;
 
 -- If not exists, create a new schema called buffers
