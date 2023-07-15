@@ -40,6 +40,8 @@ PORT = os.getenv('PORT')
 USER = os.getenv('DB_USER')
 PASSWORD = os.getenv('DB_PASSWORD')
 H3_LEVEL = os.getenv('H3_LEVEL')
+RADIUS_ACCESS = os.getenv('RADIUS_ACCESS')
+
 
 # Connect to PostgreSQL
 conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
@@ -339,7 +341,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(h3_table_name=osm_table_name+'_h3',
                                   topo_name=topology_table_name,
-                                  radius = 200, #parametrizar
+                                  radius = RADIUS_ACCESS, #parametrizar
                                   srid=srid,
                                   table_name=full_network_name,
                                   node_table=node_table_name)
