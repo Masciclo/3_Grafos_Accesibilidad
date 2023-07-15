@@ -149,7 +149,7 @@ def download_h3(table, srid, res, user, password, host, port, database_name):
     polygon_dict = json.loads(geojson.dumps(polygon_geojson.geometry))
 
     # Obtain the H3 hexagons for the area
-    h3_hexagons = h3.polyfill(polygon_dict, res=res, geo_json_conformant=True)
+    h3_hexagons = h3.polyfill(polygon_dict, res=int(res), geo_json_conformant=True)
     print(f"Number of H3 hexagons generated: {len(h3_hexagons)}")
 
     # Create the geometry column
@@ -264,16 +264,16 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
         # download_osm function should return the path to the downloaded file
         print(f'downloading {location_input} from osm ')
         df_osm = download_osm(location_input, srid, type_network)
-        print('uploading to db as {table_name}')
+        print(f'uploading to db as {table_name}')
         df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
-        print('{table_name} uploaded')
+        print(f'{table_name} uploaded')
         
 
     else:  # path_arg is a string path
         df_osm = read_csv_to_df(path_arg)
-        print('uploading from path argument to db')
+        print(f'uploading from path argument to db')
         df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)

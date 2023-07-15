@@ -47,6 +47,7 @@ MEDIUM_IMPEDANCE = os.getenv('MEDIUM_IMPEDANCE')
 LOW_IMPEDANCE = os.getenv('LOW_IMPEDANCE')
 ELSE_IMPEDANCE = os.getenv('ELSE_IMPEDANCE')
 
+
 # Connect to PostgreSQL
 conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
 
@@ -349,7 +350,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(h3_table_name=osm_table_name+'_h3',
                                   topo_name=topology_table_name,
-                                  radius = RADIUS_ACCESS, #parametrizar
+                                  radius = int(RADIUS_ACCESS), #parametrizar
                                   srid=srid,
                                   table_name=full_network_name,
                                   node_table=node_table_name)
