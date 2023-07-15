@@ -39,6 +39,7 @@ HOST = os.getenv('HOST')
 PORT = os.getenv('PORT')
 USER = os.getenv('DB_USER')
 PASSWORD = os.getenv('DB_PASSWORD')
+H3_LEVEL = os.getenv('H3_LEVEL')
 
 # Connect to PostgreSQL
 conn = utils.create_conn(DATABASE_NAME,HOST,PORT,USER,PASSWORD)
@@ -318,7 +319,7 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     # Calculate Accessibility
     #Create h3 polygons
     #parametrizar h3_level
-    utils.download_h3(osm_table_name,srid,10,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
+    utils.download_h3(osm_table_name,srid,H3_LEVEL,USER,PASSWORD,HOST,PORT,DATABASE_NAME)
     
     #Add ID to H3 Polygons
     sql_file_path = os.path.join(sql_base_path,
