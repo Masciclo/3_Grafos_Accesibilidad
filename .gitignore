@@ -11,7 +11,6 @@ shp_graph_metrics/*.RData
 .Rproj.user
 api/app/.env
 .env
-api/data/*
 api/data/app/__pycache__
 myenv
 .vscode
