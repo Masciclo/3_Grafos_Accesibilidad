@@ -191,13 +191,47 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
         
         # CASE: inhib and deshinib
         if disinhit:
+                # Verify if column op_ci exist in ciclo_table_name
+            check_column_query = f"SELECT column_name FROM information_schema.columns WHERE table_name='{ciclo_table_name}' AND column_name='op_ci';"
+            result = utils.execute_query(conn, check_column_query)
+
+            #Si la columna existe, actualizar la tabla para retener solo registros con op_ci = 0
+            if result:
+                filters_desinhib = "WHERE op_ci = 1;"
+            else:
+                filters_desinhib = ""
+
+
             desinhibitor_input_name = desinhibitor_table_name
+
+            sql_file_path_union_desinhibit = os.path.join(sql_base_path,
+                                'union_desinhibit.sql')
+            query_template_union_desinhib = utils.read_sql_file(sql_file_path_union_desinhibit)
+
+            desinhibitor_union_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}'
+
+            query = query_template_union_desinhib.format(desinhibitor_name=desinhibitor_union_name,
+                                                          ciclo_table=ciclo_table_name, 
+                                                          desinhibitor_table=desinhibitor_input_name,
+                                                          filters=filters_desinhib
+                                                          ) 
+
+            # Execute query formated
+            print('Merging desinhibitors')
+            utils.execute_query(conn, query)           
+            
+
+
+            # desinhibitor_result_name is the name of buffer result
             desinhibitor_result_name = f'{location_prefix}_inhib_{buffer_inhib}_desinhib_{buffer_desinhib}_buff'
+            
             # Format sql query
             query = query_template_buffer.format(result_table=desinhibitor_result_name, 
-                                      table_name=desinhibitor_input_name, 
+                                      table_name=desinhibitor_union_name, #this is the union of desinhibts!
                                       dist_buffer=buffer_desinhib
                                       ) 
+
+
 
             # Execute query formated
             print('Creating desinhibitor buffer')
@@ -235,6 +269,8 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
             # Execute query formated
             print('Inhibiting the network')
             utils.execute_query(conn, query)
+        
+        
         # Case: Just ihbin
         else:
             print('desinhibitor are not processing')
