@@ -272,6 +272,7 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
         
 
     else:  # path_arg is a string path
+        print(f"Leyendo archivo ubicado en {path_arg}")
         df_osm = read_csv_to_df(path_arg)
         print(f'uploading from path argument to db')
         if df_osm.geometry.type[0] == "Linestring":    
