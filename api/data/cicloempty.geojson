@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+"name": "cicloempty",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::32719" } },
+"features": [
+{ "type": "Feature", "properties": { "comuna": null, "ci_o_cr": null, "tip_v_c": null, "ancho_v": null, "t_sg_vd": null, "t_seg_c": null, "ci_vd": null, "ci_par": null, "ci_s_pr": null, "ci_ca": null, "otros_c": null, "materil": null, "veg": null, "t_vi_cr": null, "senalzd": null, "pintado": null, "semafor": null, "cartel": null, "otrs_cr": null, "ciclov": null, "discon": null, "lines_p": null, "color_p": null, "ancho_s": null, "ci_plat": null, "ci_band": null, "phanto": null, "comp": null, "largo_m": null, "shp_lng": null, "dscn_cr": null, "oneway": null, "id": null, "ciclv_n": null, "pists_v": null, "ancho_vi": null, "fecha_c": null, "id_2": null, "proyect": null, "tipci": null, "op_ci": null, "tp_p_sp": null, "tp_p_sg_c": null, "tp_p_sg_v": null, "tp_p_ds": null }, "geometry": { "type": "MultiLineString", "coordinates": [ [ [ 365023.12994500255445, 6293097.739105164073408 ], [ 365026.936146376770921, 6293094.201289784163237 ], [ 365026.936146376770921, 6293094.201289784163237 ], [ 365026.936146376770921, 6293094.201289784163237 ], [ 365026.936146376770921, 6293094.201289784163237 ], [ 365026.936146376770921, 6293094.201289784163237 ] ] ] } }
+]
+}
