@@ -123,7 +123,7 @@ grafos-accesibilidad/
 ## Descripción del Proyecto 📌
 
 ### Objetivo
-Este proyecto tiene como objetivo cortar la red con un buffer, para luego calcular en cada seccion y procesar redes de ciclovías a nivel global utilizando datos de **OpenStreetMap (OSM)**. A través de un entorno contenerizado con **Docker**, se integran tecnologías como **PostgreSQL**, **PostGIS**, y **pgRouting** para realizar análisis geoespaciales avanzados y calcular métricas clave como **accesibilidad**, **centralidad**, y **conectividad**.
+Este proyecto automatiza el análisis de redes cicloviarias mediante un flujo ETL geoespacial que: 1) **Ingiere datos OSM**, 2) **Aplica buffers de inhibición/desinhibición para segmentar la red**, 3) **Calcula métricas de conectividad** (centralidad, accesibilidad isocrónica) usando pgRouting, y 4) **Exporta resultados en grillas H3 para visualización**. La arquitectura Dockerizada (PostGIS + Python) permite procesar ciudades completas mediante consultas SQL optimizadas y pipelines reproducibles, priorizando escalabilidad en el manejo de datasets geoespaciales masivos.
 
 ### Tecnologías Utilizadas
 - **Docker**: Para la creación y gestión de contenedores.
