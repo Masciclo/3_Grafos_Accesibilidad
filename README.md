@@ -27,7 +27,7 @@
 
 ## **Versión 1.0 (Python)**
 ---
-<img src="https://github.com/user-attachments/assets/3228e688-66a0-4be7-b209-a1a9f19528b8" alt="Description of the image" width="800" height="auto">
+<img src="https://github.com/user-attachments/assets/3228e688-66a0-4be7-b209-a1a9f19528b8" alt="Description of the image" width="600" height="auto">
 
 
 ### Descripción del Proyecto 📌
