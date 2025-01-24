@@ -29,6 +29,7 @@
 ---
 <img src="https://github.com/user-attachments/assets/3228e688-66a0-4be7-b209-a1a9f19528b8" alt="Description of the image" width="600" height="auto">
 
+*Metricas de la red**
 
 ### Descripción del Proyecto 📌
 **Objetivo**: Análisis básico de redes de transporte usando grafos en memoria  
@@ -36,18 +37,35 @@
 - Python 3.9+ con NetworkX 2.6 y Pandas 1.3
 - Almacenamiento en CSV/GeoJSON
 
-**Métricas Calculadas**:
-- Centralidad de grado (degree centrality)
-- Accesibilidad mediante Dijkstra simple
-- Densidad de conexiones por zona
+## Métricas Calculadas 📈
+### Nodos y Aristas
+1. **Centralidad de Grado** (`degree_centrality`)
+2. **Centralidad de Intermediación** (`betweenness_centrality`)
+3. **Centralidad de Cercanía** (`closeness_centrality`)
+
+### Accesibilidad
+1. **Accesibilidad ponderada por impedancia**
+2. **Distancias mínimas (Dijkstra)**
+3. **Conectividad por componentes**
+
+### Espaciales
+1. **Densidad de ciclovías por km²**
+2. **Cobertura geográfica (buffers)**
+3. **Superposición con red vial principal**
 
 ---
 
-### Características Clave 🌟
-- Importación desde Shapefiles y GeoJSON
-- Visualización estática con Matplotlib
-- Exportación a formatos abiertos
-- Sistema básico de filtrado por atributos
+## Parámetros Principales 🌟
+| Parámetro | Descripción | Valores Típicos |
+|-----------|-------------|-----------------|
+| `--osm_input` | Fuente de datos OSM (GeoJSON o "osm") | `data/red_vial.geojson` |
+| `--ciclo_input` | Datos de ciclovías (GeoJSON) | `data/ciclovias.geojson` |
+| `--location` | Ubicación geográfica | `"Santiago, Chile"` |
+| `--buffer_inhibidores` | Radio de inhibición (metros) | `15` |
+| `--buffer_desinhibicion` | Radio de desinhibición (metros) | `25` |
+| `--srid` | Sistema de coordenadas | `32719` |
+
+---
 
 ### Instalación ⚙️
 markdown
@@ -81,22 +99,31 @@ red.exportar_metricas('resultados/metricas_v1.csv')
 
 ### Estructura del Proyecto 📂
 
-v1-python/
-├── grafo_basico.py    # Lógica principal
-├── utils/             # Herramientas auxiliares
-├── datos/             # Ejemplos en GeoJSON
-└── requeriments.txt   # Dependencias básicas
+grafos-accesibilidad/
+├── data/                # Datos de entrada
+│   ├── ejemplos/        # Datos sample
+│   └── resultados/      # Salidas generadas
+├── src/
+│   ├── grafo.py         # Clase principal
+│   ├── metricas/        # Cálculos especializados
+│   └── utils/           # Herramientas auxiliares
+├── requirements.txt
+└── LICENSE
 
 ---
+
+
 
 ## *Versión 2.0 (Docker + PostGIS)*
 ---
 <img src="https://github.com/user-attachments/assets/ed1a4a59-55fa-440c-a3dd-a6ec0d871cfa" alt="Description of the image" width="600" height="auto">
 
+* Impendancia y Analisis por componentes**
+  
 ## Descripción del Proyecto 📌
 
 ### Objetivo
-Este proyecto tiene como objetivo analizar y procesar redes de ciclovías a nivel global utilizando datos de **OpenStreetMap (OSM)**. A través de un entorno contenerizado con **Docker**, se integran tecnologías como **PostgreSQL**, **PostGIS**, y **pgRouting** para realizar análisis geoespaciales avanzados y calcular métricas clave como **accesibilidad**, **centralidad**, y **conectividad**.
+Este proyecto tiene como objetivo cortar la red con un buffer, para luego calcular en cada seccion y procesar redes de ciclovías a nivel global utilizando datos de **OpenStreetMap (OSM)**. A través de un entorno contenerizado con **Docker**, se integran tecnologías como **PostgreSQL**, **PostGIS**, y **pgRouting** para realizar análisis geoespaciales avanzados y calcular métricas clave como **accesibilidad**, **centralidad**, y **conectividad**.
 
 ### Tecnologías Utilizadas
 - **Docker**: Para la creación y gestión de contenedores.
@@ -104,11 +131,47 @@ Este proyecto tiene como objetivo analizar y procesar redes de ciclovías a nive
 - **Python**: Para la manipulación de datos y ejecución de pipelines.
 - **GeoPandas**: Para el procesamiento de datos geoespaciales en Python.
 
+### 🔄 Flujo Completo de Análisis
+
+Entrada de Datos:
+```bash
+docker exec python-app python main.py \
+  --osm_input=data/ciudad.geojson \
+  --location="Paris, Francia" \
+  --srid=2154
+```
+Procesamiento en PostGIS:
+
+1. Conversión a geometrías proyectadas
+
+- Generación de topología de red
+- Aplicación de buffers de inhibición
+
+2. Cálculos con pgRouting:
+
+- Betweenness Centrality ponderada
+- Rutas óptimas considerando impedancias
+- Análisis de conectividad multimodal
+
+3. Salida:
+
+- Capas GeoJSON con métricas espacializadas
+- Celdas H3 con indicadores agregados
+
+Metadatos técnicos en formato JSON
 ### Métricas Calculadas
-- **Centralidad de intermediación (Betweenness Centrality)**
-- **Centralidad de nodos (Node Centrality)**
+- **Componentes de la red (Node components)**
 - **Accesibilidad isocrónica (buffers temporales)**
 - **Conectividad multimodal**
+
+📊 Ejemplo de Resultados Generados
+
+| Capa GeoJSON                  | Campos                           | Descripción                                  |
+|-------------------------------|----------------------------------|----------------------------------------------|
+| `nodos_centralidad.geojson`   | `betweenness`, `closeness`       | Importancia estratégica de intersecciones    |
+| `accesibilidad_h3.geojson`    | `tiempo_promedio`, `conteo_rutas`| Accesibilidad por celdas hexagonales         |
+| `red_final.geojson`           | `impedancia`, `tipo_via`         | Red operativa después de inhibición          |
+| `componentes_conexos.geojson` | `component_id`, `nodos_count`    | Sub-redes conectadas (islas de accesibilidad)|
 
 ---
 
