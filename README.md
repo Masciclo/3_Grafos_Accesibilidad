@@ -91,7 +91,7 @@ v1-python/
 
 ## *Versión 2.0 (Docker + PostGIS)*
 ---
-![Image](https://github.com/user-attachments/assets/ed1a4a59-55fa-440c-a3dd-a6ec0d871cfa)
+<img src="https://github.com/user-attachments/assets/ed1a4a59-55fa-440c-a3dd-a6ec0d871cfa" alt="Description of the image" width="600" height="auto">
 
 ## Descripción del Proyecto 📌
 
