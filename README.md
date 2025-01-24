@@ -88,6 +88,8 @@ v1-python/
 ---
 
 ## *Versión 2.0 (Docker + PostGIS)*
+
+![Image](https://github.com/user-attachments/assets/ed1a4a59-55fa-440c-a3dd-a6ec0d871cfa)
 ---
 
 ## Descripción del Proyecto 📌
