@@ -28,6 +28,8 @@
 ## **Versión 1.0 (Python)**
 ---
 
+![Image](https://github.com/user-attachments/assets/3228e688-66a0-4be7-b209-a1a9f19528b8)
+
 ### Descripción del Proyecto 📌
 **Objetivo**: Análisis básico de redes de transporte usando grafos en memoria  
 **Tecnologías**:
@@ -88,9 +90,8 @@ v1-python/
 ---
 
 ## *Versión 2.0 (Docker + PostGIS)*
-
-![Image](https://github.com/user-attachments/assets/ed1a4a59-55fa-440c-a3dd-a6ec0d871cfa)
 ---
+![Image](https://github.com/user-attachments/assets/ed1a4a59-55fa-440c-a3dd-a6ec0d871cfa)
 
 ## Descripción del Proyecto 📌
 
