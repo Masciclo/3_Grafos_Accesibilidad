@@ -261,9 +261,9 @@ python main.py \
 - buffer_disinhibitor: Radio del buffer de desinhibición en metros.
 
 ---
-
+```bash
 ### Estructura del Proyecto 📂
-Copy
+
 grafos-accesibilidad/
 ├── docker-compose.yml    # Configuración de contenedores
 ├── postgis/              # Configuración de la base de datos PostGIS
@@ -274,7 +274,7 @@ grafos-accesibilidad/
 ├── data/                 # Datos de entrada (GeoJSON, Shapefiles)
 ├── .env                  # Variables de entorno
 └── LICENSE               # Licencia del proyecto
-
+```
 ---
 
 ## Contribución 🤝
