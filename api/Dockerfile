@@ -1,14 +1,17 @@
-FROM python:3.9
+# Using official Python runtime as a parent image
+FROM python:3.8-slim-buster
 
-WORKDIR /code
+# Working directory to /app
+WORKDIR /app
 
-COPY ./requirements.txt /code/requirements.txt
+# Copies the rest of your code to the working directory in the Docker container
+COPY ./app /app
+COPY ./requirements.txt /app
+COPY ./data /app/data
 
-COPY ./app /code/app
 
+# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-EXPOSE 80
-
-#configurar
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "80"]
+# Command to run on container start
+CMD ["tail", "-f", "/dev/null"]

@@ -1,0 +1,25 @@
+# Using official Python runtime as a parent image
+FROM python:3.11
+
+# Install GDAL dependencies, specially for macos
+RUN apt-get update && apt-get install -y gdal-bin libgdal-dev g++
+
+# Set GDAL environment variable
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+ENV GDAL_VERSION=3.2
+
+# Working directory to /app
+WORKDIR /app
+
+# Copies the rest of your code to the working directory in the Docker container
+COPY ./app /app
+COPY ./requirements.txt /app
+COPY ./data /app/data
+
+
+# Install any needed packages specified in requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Command to run on container start
+CMD ["tail","-f","/dev/null"]

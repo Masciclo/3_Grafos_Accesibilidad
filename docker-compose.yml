@@ -1,16 +1,34 @@
 version: "3"
 
 services:
-  fastapi:
-    image: fast-api-stations
-    ports:
-      - "8000:80"
-
   stationdb:
-    image: postgis/postgis
+    build:
+      context: ./db
+      dockerfile: Dockerfile
     environment:
-      POSTGRES_USER: jkaub
-      POSTGRES_PASSWORD: jkaub
-      POSTGRES_DB: stations
+      POSTGRES_USER: ciclo
+      POSTGRES_PASSWORD: ciclo
+      POSTGRES_DB: ciclo_dev
+    ports:
+      - "5432:5432"
     volumes:
-      - ./db:/var/lib/postgresql/data
+      - stationdb_data:/var/lib/postgresql/data
+      - ./db/init-queries:/docker-entrypoint-initdb.d
+
+  ciclo-py:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    volumes:
+      - ./api/data:/app/data
+    environment:
+      DATABASE_NAME: ${DATABASE_NAME}
+      HOST: ${HOST}
+      PORT: ${PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on: 
+      - stationdb
+
+volumes:
+  stationdb_data:
