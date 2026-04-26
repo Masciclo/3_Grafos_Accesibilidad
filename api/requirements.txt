@@ -8,3 +8,8 @@ python-dotenv==1.0.0
 osmnx==1.*
 h3==3.*
 geojson==3.*
+# Phase 4: Visualization and Progress Tracking
+tqdm>=4.65.0
+streamlit>=1.24.0
+folium>=0.14.0
+streamlit-folium>=0.13.0
