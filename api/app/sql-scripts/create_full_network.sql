@@ -17,6 +17,11 @@ WHERE
 	ST_GeometryType(geometry) IN ('ST_LineString', 'ST_MultiLineString');
 
 ALTER TABLE {result_name} ADD COLUMN id SERIAL PRIMARY KEY;
+ALTER TABLE {result_name} ADD COLUMN length float;
+ALTER TABLE {result_name} ADD COLUMN cost float;
+
+UPDATE {result_name} SET length = ST_Length(geometry);
+UPDATE {result_name} SET cost = ST_Length(geometry) * impedance;
 
 CREATE INDEX IF NOT EXISTS geom_idx 
 ON {result_name}

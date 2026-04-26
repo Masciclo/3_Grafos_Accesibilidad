@@ -1,55 +1,41 @@
+-- Harmonized Accessibility Centrality Algorithm (pgRouting Standard)
+-- This script uses pgr_dijkstra on the source/target topology for consistency.
+
+-- 1. Prepare H3 centroid and find nearest routing node
 ALTER TABLE {h3_table_name} 
-ADD COLUMN centroid GEOMETRY(POINT, {srid});
+ADD COLUMN IF NOT EXISTS centroid GEOMETRY(POINT, {srid});
 
 UPDATE {h3_table_name}
 SET centroid = ST_Centroid(geometry);
 
 ALTER TABLE {h3_table_name} 
-ADD COLUMN nearest_node_id INTEGER;
+ADD COLUMN IF NOT EXISTS nearest_node_id INTEGER;
 
-CREATE INDEX node_geom_idx ON {node_table} USING gist(geom);
+-- Create spatial index for fast nearest neighbor search
+CREATE INDEX IF NOT EXISTS node_geom_idx ON {node_table} USING gist(geom);
 
 UPDATE {h3_table_name} AS h
-SET nearest_node_id = 
-(
-    SELECT node_id FROM {node_table} AS n
-    WHERE ST_DWithin(h.centroid, n.geom, {radius})
-    ORDER BY h.centroid <-> n.geom ASC
+SET nearest_node_id = (
+    SELECT id FROM {node_table} AS n
+    ORDER BY h.centroid <-> n.the_geom ASC
     LIMIT 1
 );
 
+-- 2. Calculate Accessibility using pgr_dijkstra on the synchronized topology
 ALTER TABLE {h3_table_name} 
-ADD COLUMN accessibility FLOAT;
+ADD COLUMN IF NOT EXISTS accessibility FLOAT;
 
-drop table if exists temp_table;
-CREATE temp TABLE temp_table AS
-WITH impedance_table AS
-(
-	SELECT (GetTopoGeomElements(topogeom))[1] AS edge_data_id, impedance
-	FROM {table_name} 
-)
-SELECT
-	distinct
-    ed.edge_id AS id,
-    ed.start_node AS source,
-    ed.end_node AS target,
-    ST_Length(ed.geom)*it.impedance AS cost,
-    ed.geom as the_geom
-FROM
-    {topo_name}.edge_data AS ed
-left JOIN impedance_table AS it ON ed.edge_id = it.edge_data_id;
-
+-- Aggregate cost to all other reachable nodes within a baseline set
+-- (Using the same source/target logic as betweenness_centrality.sql)
 UPDATE {h3_table_name} AS h1
-SET accessibility = 
-(
-    SELECT SUM(cost) FROM
-    (
+SET accessibility = (
+    SELECT SUM(cost) FROM (
         SELECT cost FROM pgr_dijkstra(
-        'SELECT id, source, target, cost FROM temp_table',
-        h1.nearest_node_id,
-        ARRAY(SELECT nearest_node_id FROM {h3_table_name} WHERE nearest_node_id IS NOT NULL),
-        directed := false
-        ) AS routes
+            'SELECT id, source, target, cost FROM {table_name}',
+            h1.nearest_node_id,
+            ARRAY(SELECT nearest_node_id FROM {h3_table_name} WHERE nearest_node_id IS NOT NULL),
+            directed := false
+        )
     ) AS total_cost
-);
-
+)
+WHERE h1.nearest_node_id IS NOT NULL;

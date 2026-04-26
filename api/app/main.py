@@ -121,33 +121,35 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                PORT,
                                DATABASE_NAME)
 
-    # handle inhibitor argument 
-    utils.handle_path_argument('inhibitor',
-                               inhibitor_input,
-                               inhibitor_base_path,
-                               inhibitor_table_name,
-                               location_input,
-                               'LineString',
-                               srid,
-                               USER,
-                               PASSWORD,
-                               HOST,
-                               PORT,
-                               DATABASE_NAME)
+    # handle inhibitor and desinhibitor arguments only if inhibition is active
+    if inhibit:
+        # handle inhibitor argument 
+        utils.handle_path_argument('inhibitor',
+                                   inhibitor_input,
+                                   inhibitor_base_path,
+                                   inhibitor_table_name,
+                                   location_input,
+                                   'LineString',
+                                   srid,
+                                   USER,
+                                   PASSWORD,
+                                   HOST,
+                                   PORT,
+                                   DATABASE_NAME)
 
-    #handle desinhibitor argument
-    utils.handle_path_argument('deshinibitor',
-                               disinhitor_input,
-                               desinhibitor_base_path,
-                               desinhibitor_table_name,
-                               location_input,
-                               'POINT',
-                               srid,
-                               USER,
-                               PASSWORD,
-                               HOST,
-                               PORT,
-                               DATABASE_NAME)
+        #handle desinhibitor argument
+        utils.handle_path_argument('deshinibitor',
+                                   disinhitor_input,
+                                   desinhibitor_base_path,
+                                   desinhibitor_table_name,
+                                   location_input,
+                                   'POINT',
+                                   srid,
+                                   USER,
+                                   PASSWORD,
+                                   HOST,
+                                   PORT,
+                                   DATABASE_NAME)
 
 
 
@@ -334,6 +336,15 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
     query_template = utils.read_sql_file(sql_file_path)
     query = query_template.format(layer_name=full_network_name, 
                                   schema_name='public')
+    utils.execute_query(conn, query)
+
+    # Create pgRouting topology (source/target columns)
+    sql_file_path = os.path.join(sql_base_path,
+                                'create_routing_topology.sql')
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(table=full_network_name)
+    print('Creating routing topology (source/target)')
+    utils.execute_query(conn, query)
   
 
     # Create and clean the topology for inhibited network (impedance =< 1)
@@ -361,6 +372,16 @@ def data_pipeline(osm_input, ciclo_input, location_input, srid, inhibit, inhibit
                                   result_table=components_table_name,
                                   table_name=full_network_name)
     print('Calculating components')
+    utils.execute_query(conn, query)
+
+    # Calculate Local Betweenness Centrality (Dijkstra-Loop)
+    sql_file_path = os.path.join(sql_base_path,
+                                'betweenness_centrality.sql')
+    query_template = utils.read_sql_file(sql_file_path)
+    query = query_template.format(network_table=full_network_name,
+                                  edge_weight_column='cost',
+                                  directed='false')
+    print('Calculating local betweenness (Scalable Dijkstra-Loop)')
     utils.execute_query(conn, query)
 
     # Calculate Accessibility
@@ -452,4 +473,3 @@ def main():
 
 if __name__=='__main__':
     main()
-

@@ -248,6 +248,10 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
 
     conn = create_conn(database_name,host,port,user,password)
 
+    if path_arg is None or path_arg == 'None':
+        print(f'Skipping {type_network} as no input was provided.')
+        return
+
     if path_arg == '':
         # if exist then skipp, else upload base file example
         if check_table_existence(conn, table_name):

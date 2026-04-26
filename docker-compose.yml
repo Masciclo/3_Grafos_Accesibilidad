@@ -18,7 +18,7 @@ services:
   ciclo-py:
     build:
       context: ./api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile_macos
     volumes:
       - ./api/data:/app/data
     environment:
@@ -27,6 +27,12 @@ services:
       PORT: ${PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      H3_LEVEL: ${H3_LEVEL}
+      RADIUS_ACCESS: ${RADIUS_ACCESS}
+      HIGH_IMPEDANCE: ${HIGH_IMPEDANCE}
+      MEDIUM_IMPEDANCE: ${MEDIUM_IMPEDANCE}
+      LOW_IMPEDANCE: ${LOW_IMPEDANCE}
+      ELSE_IMPEDANCE: ${ELSE_IMPEDANCE}
     depends_on: 
       - stationdb
 
