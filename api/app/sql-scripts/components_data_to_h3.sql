@@ -1,7 +1,7 @@
 drop table if exists h3_components_inter;
 create temp table h3_components_inter as
 select
-	h3.id as id_hex,
+	h3.h3_index as id_hex,
 	components.component,
 	st_intersection(components.the_geom,h3.geometry) as geometry
 from
@@ -11,57 +11,35 @@ where
 	st_intersects(components.the_geom,h3.geometry) = TRUE
 ORDER BY id_hex;
 
-drop table if exists components_length;
-create temp table components_length as
-select
-	component,
-	sum(st_length(the_geom)) as component_length
-from
-	{component_table} components
-group by component
-order by component;
+-- Ensure columns exist in the target table
+ALTER TABLE {h3_table} ADD COLUMN IF NOT EXISTS m_comp integer;
+ALTER TABLE {h3_table} ADD COLUMN IF NOT EXISTS comp_total float;
 
-alter table {h3_table}
-add column if not exists {result_table}_component int,
-add column if not exists {result_table}_comp_intersect float,
-add column if not exists {result_table}_comp_total float;
-
-update {h3_table}
-set {result_table}_component = subquery.component,
-{result_table}_comp_intersect = subquery.comp_intersect,
-{result_table}_comp_total = subquery.comp_total
+-- Aggregating predominant component and total length per hexagon
+WITH components_length AS (
+    SELECT 
+        id_hex, 
+        component, 
+        SUM(ST_Length(geometry)) as component_length
+    FROM h3_components_inter
+    GROUP BY id_hex, component
+),
+predominant_components AS (
+    SELECT DISTINCT ON (id_hex)
+        id_hex, 
+        component as predominant_component
+    FROM components_length
+    ORDER BY id_hex, component_length DESC
+)
+UPDATE {h3_table}
+SET m_comp = subquery.comp_intersect,
+    comp_total = subquery.comp_total
 FROM (
-    WITH component_intersections AS (
-    	SELECT
-    		id_hex,
-    		component,
-    		sum(st_length(geometry)) as intersection_length
-    	FROM
-    		h3_components_inter
-    	GROUP BY id_hex, component
-    ),
-    ranked_components AS (
-    	SELECT
-    		*,
-    		ROW_NUMBER() OVER(PARTITION BY id_hex ORDER BY intersection_length DESC) as rn
-    	FROM component_intersections
-    ),
-    predominant_components AS (
-    	SELECT
-    		id_hex,
-    		component AS predominant_component,
-    		intersection_length AS predominant_component_length
-    	FROM ranked_components
-    	WHERE rn = 1
-    )
-    SELECT
-    	pc.id_hex,
-    	pc.predominant_component as component,
-    	pc.predominant_component_length as comp_intersect,
+    SELECT 
+        pc.id_hex, 
+        pc.predominant_component AS comp_intersect,
     	cl.component_length AS comp_total
     FROM predominant_components pc
-    JOIN components_length cl ON pc.predominant_component = cl.component
-    ORDER BY id_hex
+    JOIN components_length cl ON pc.predominant_component = cl.component AND pc.id_hex = cl.id_hex
 ) as subquery
-where {h3_table}.id = subquery.id_hex;
-
+where {h3_table}.h3_index = subquery.id_hex;

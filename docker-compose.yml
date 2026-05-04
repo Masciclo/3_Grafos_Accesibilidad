@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ciclo
       POSTGRES_DB: ciclo_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - stationdb_data:/var/lib/postgresql/data
       - ./db/init-queries:/docker-entrypoint-initdb.d
@@ -20,6 +20,7 @@ services:
       context: ./api
       dockerfile: Dockerfile_macos
     volumes:
+      - ./api/app:/app
       - ./api/data:/app/data
     environment:
       DATABASE_NAME: ${DATABASE_NAME}
@@ -27,6 +28,9 @@ services:
       PORT: ${PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      PYTHONIOENCODING: utf-8
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
       H3_LEVEL: ${H3_LEVEL}
       RADIUS_ACCESS: ${RADIUS_ACCESS}
       HIGH_IMPEDANCE: ${HIGH_IMPEDANCE}

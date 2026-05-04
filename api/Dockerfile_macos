@@ -1,6 +1,11 @@
 # Using official Python runtime as a parent image
 FROM python:3.11
 
+# Set environment variables for UTF-8 support
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PYTHONIOENCODING=utf-8
+
 # Install GDAL dependencies, specially for macos
 RUN apt-get update && apt-get install -y gdal-bin libgdal-dev g++
 
@@ -19,7 +24,8 @@ COPY ./data /app/data
 
 
 # Install any needed packages specified in requirements.txt
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --upgrade pip
+RUN pip3 install --no-cache-dir --default-timeout=100 -r requirements.txt
 
 # Command to run on container start
 CMD ["tail","-f","/dev/null"]

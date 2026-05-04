@@ -2,7 +2,7 @@
 drop table if exists h3_osm_inter;
 create temp table h3_osm_inter as
 select
-	h3.id as id_hex,
+	h3.h3_index as id_hex,
 	st_intersection(osm.geometry,h3.geometry) as geometry
 from
 	{osm_table} osm,
@@ -24,4 +24,4 @@ FROM (
 		h3_osm_inter
 	group by id_hex
 ) as subquery
-where {h3_table}.id = subquery.id_hex;
+where {h3_table}.h3_index = subquery.id_hex;

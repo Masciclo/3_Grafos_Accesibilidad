@@ -1,33 +1,24 @@
--- FOR COMPONENTS
-drop table if exists {result_table};
-CREATE TABLE {result_table} AS
-WITH impedance_table AS
-(
-	SELECT (GetTopoGeomElements(topogeom))[1] AS edge_data_id, impedance
-	FROM {table_name} 
-	where impedance <= 1
-)
-SELECT
-	distinct
-    ed.edge_id AS id,
-    ed.start_node AS source,
-    ed.end_node AS target,
-    ST_Length(ed.geom) AS len,
-	it.impedance,
-    ed.geom as the_geom,
-    0 AS component 
-FROM
-    {topo_name}.edge_data AS ed
-left JOIN impedance_table AS it ON ed.edge_id = it.edge_data_id
-where impedance <= 1;
-	
-drop table if exists components_table;
-create temp table components_table as
-select * from pgr_connectedComponents(
-    'SELECT id, source, target, len as cost FROM {result_table}'
+-- Calculate Connected Components for pgRouting Graph
+-- Generates:
+-- 1. {result_table}: Edge table with 'component' ID (for H3 intersection)
+-- 2. {result_table}_nodes: Node table with 'component' ID (for Snapping)
+
+DROP TABLE IF EXISTS {result_table}_nodes;
+CREATE TABLE {result_table}_nodes AS
+SELECT node as id, component
+FROM pgr_connectedComponents(
+    'SELECT id, source, target, cost FROM {table_name}'
 );
 
-UPDATE {result_table}
-SET component = components_table.component
-FROM components_table
-WHERE {result_table}.source = components_table.node;
+DROP TABLE IF EXISTS {result_table};
+CREATE TABLE {result_table} AS
+SELECT 
+    n.*,
+    n.geometry as the_geom,
+    c.component
+FROM {table_name} n
+JOIN {result_table}_nodes c ON n.source = c.id;
+
+-- Create spatial indices
+CREATE INDEX IF NOT EXISTS {result_table}_geom_idx ON {result_table} USING GIST (the_geom);
+CREATE INDEX IF NOT EXISTS {result_table}_nodes_idx ON {result_table}_nodes (id);
