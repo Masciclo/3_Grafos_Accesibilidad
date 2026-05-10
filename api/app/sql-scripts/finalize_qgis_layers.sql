@@ -1,0 +1,42 @@
+-- finalize_qgis_layers.sql
+-- Phase 6: Standardizes the final output into two Master Layers for QGIS.
+
+-- 1. Create Master Network Layer
+-- We join the routing results (od_flow) with the intermodal network.
+DROP TABLE IF EXISTS {scenario_prefix}_network;
+CREATE TABLE {scenario_prefix}_network AS
+SELECT 
+    n.id as edge_id,
+    n.geometry,
+    n.highway,
+    n.impedance,
+    COALESCE(n.is_project, FALSE) as is_project,
+    COALESCE(n.od_flow, 0) as od_flow,
+    (COALESCE(n.od_flow, 0) / NULLIF(ST_Length(n.geometry), 0)) as cost_effective
+FROM {network_table} n;
+
+CREATE INDEX {scenario_prefix}_net_gix ON {scenario_prefix}_network USING GIST (geometry);
+
+-- 2. Create Master H3 Layer
+-- We already have the H3 table being populated in Stage 8. 
+-- We just ensure it follows the naming convention and has clean columns.
+DROP TABLE IF EXISTS {scenario_prefix}_h3;
+CREATE TABLE {scenario_prefix}_h3 AS
+SELECT 
+    h3_index,
+    geometry,
+    COALESCE(pop_total, 0) as pop_total,
+    COALESCE(od_flow, 0) as od_flow,
+    COALESCE(m_osm, 0) as m_osm,
+    COALESCE(m_project, 0) as m_project
+FROM {h3_table};
+
+CREATE INDEX {scenario_prefix}_h3_gix ON {scenario_prefix}_h3 USING GIST (geometry);
+
+-- 3. Cleanup Intermediate Tables (Optional but recommended for hygiene)
+-- We keep them for now but we could DROP them here.
+
+DO $$
+BEGIN
+    RAISE NOTICE 'QGIS Master Layers finalized: %_network and %_h3', '{scenario_prefix}', '{scenario_prefix}';
+END $$;

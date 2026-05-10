@@ -44,6 +44,25 @@ class BannerAnimator:
         self.current_frame = (self.current_frame + 1) % len(self.frames)
         return frame
 
+# Metadata Standard Schemas (INE and SECTRA)
+CHILEAN_SCHEMAS = {
+    "INE_CENSO_2024": {
+        "pop_total": ["pop_h3", "PERSONAS", "TOTAL_PERS", "CANT_PERS", "n_per"],
+        "age_0_14": ["P01_1", "EDAD_0_14"],
+        "age_65_plus": ["P01_3", "EDAD_65_MAS"],
+        "households": ["HOGARES", "TOTAL_HOG"],
+        "geometry": ["geometry", "geom"]
+    },
+    "SECTRA_EOD": {
+        "trips": ["trips", "VIAJES", "n_viajes"],
+        "expansion_factor": ["Factor_Expansion", "FACTOR", "FACTOR_EXPANSION", "factor_exp"],
+        "purpose": ["Proposito", "PROPOSITO_VIAJE"],
+        "mode": ["Modo", "MODO_TRANSPORTE"],
+        "h3_origin": ["h3_origin", "ORIGEN_H3"],
+        "h3_dest": ["h3_dest", "h3_destination", "DESTINO_H3"]
+    }
+}
+
 class DiagnosticHandler:
     '''
     Description: Handles Phase 4 Observability Framework (Errors and Warnings).
@@ -58,7 +77,7 @@ class DiagnosticHandler:
         # Log to rich console with emoji
         console.print(f"{emoji} [{color} BOLD][{level}] {code}:[/] {message}")
 
-    def validate_inputs(self, od_path, census_path):
+    def validate_inputs(self, od_path, census_path, projects_path=None):
         '''Operational: Check existence and basic schema format'''
         results = []
         
@@ -85,15 +104,21 @@ class DiagnosticHandler:
             status = "[green]EXISTS[/]" if exists else "[red]MISSING[/]"
             results.append(["Census Data", os.path.basename(census_path), status])
 
+        # Check Projects (Phase 5)
+        if projects_path:
+            exists = os.path.exists(projects_path)
+            status = "[green]EXISTS[/]" if exists else "[red]MISSING[/]"
+            results.append(["Scenario Projects", os.path.basename(projects_path), status])
+
         return results
 
-    def get_input_table(self, od_path, census_path):
+    def get_input_table(self, od_path, census_path, projects_path=None):
         table = Table(title="[bold blue]Pre-flight Input Checklist", box=None, expand=True)
         table.add_column("Resource", style="bold")
         table.add_column("Source/Detail")
         table.add_column("Status", justify="right")
         
-        results = self.validate_inputs(od_path, census_path)
+        results = self.validate_inputs(od_path, census_path, projects_path)
         for res in results:
             table.add_row(*res)
         return table
@@ -114,6 +139,21 @@ class DiagnosticHandler:
                 self.report("NETWORK_FRAGMENTATION", "WARNING", f"Graph is highly fragmented. {isolated_pct:.1f}% of nodes are isolated islands.")
             else:
                 self.report("TOPOLOGY_HEALTH", "INFO", f"Network connected. Isolated nodes: {isolated_pct:.1f}%")
+
+    def metadata_audit(self, source_name, columns):
+        '''Operational: Report detected schema mapping'''
+        mapping = {}
+        schema = CHILEAN_SCHEMAS.get(source_name, {})
+        for internal, aliases in schema.items():
+            # Match if column is exactly the internal name OR in aliases
+            all_aliases = [internal] + aliases
+            found = [col for col in columns if col in all_aliases]
+            if found:
+                mapping[internal] = found[0]
+        
+        if mapping:
+            self.report("METADATA_MAPPING", "INFO", f"Detected {source_name} schema. Mapped {len(mapping)} attributes.")
+        return mapping
 
 diagnostic_handler = DiagnosticHandler()
 
@@ -138,27 +178,32 @@ def create_conn(database_name, host, port, user, password):
     )
     return conn
 
-def read_csv_to_df(file_path):
+def read_any_spatial_file(file_path, bbox=None):
     '''
-    Description: This function reads a csv file into a GeoPandas DataFrame
-    Input: path of csv file
-    Output: DataFrame
+    Description: Robust reader for CSV (H3), GeoJSON, and Parquet with optional BBOX clipping.
     '''
+    if file_path.endswith('.parquet'):
+        return gpd.read_parquet(file_path, bbox=tuple(bbox) if bbox is not None else None)
+    elif file_path.endswith('.csv'):
+        return pd.read_csv(file_path)
+    else:
+        return gpd.read_file(file_path)
 
-    df = gpd.read_file(file_path) # Read file
-    return df
 
-
-def df_to_postgres(df, table_name,geom_type, srid, user, password, host, port, database_name):
+def df_to_postgres(df, table_name, geom_type, srid, user, password, host, port, database_name):
     '''
     Description: upload a df object into a database
-    Input: df object (from read_csv_to_df function) and a name for the table   
+    Input: df object and a name for the table   
     '''
     # ensure integer
     srid = int(srid)
 
-    # Convert geometry to WKTElement
-    df['geometry'] = df['geometry'].apply(lambda geom: WKTElement(geom, srid=srid))
+    # Convert geometry to WKTElement if it exists
+    if 'geometry' in df.columns:
+        df['geometry'] = df['geometry'].apply(lambda geom: WKTElement(geom, srid=srid))
+        dtype = {'geometry': Geometry(geom_type, srid=srid)}
+    else:
+        dtype = {}
 
     # Create SQL Alchemy Engine
     engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
@@ -169,19 +214,16 @@ def df_to_postgres(df, table_name,geom_type, srid, user, password, host, port, d
         engine, 
         if_exists='replace', 
         index=False, 
-        dtype={'geometry': Geometry(geom_type, srid=srid)}
+        dtype=dtype
     )
 
-    #Create spatial Index 
-    sql_file_path = os.path.join(sql_base_path,
-                                'create_spatial_index.sql')
-    query_template = read_sql_file(sql_file_path)
-    query = query_template.format(layer_name=table_name, 
-                                schema_name='public')
-    # create connection
-    conn = create_conn(database_name,host,port,user,password)
-    # execute query
-    execute_query(conn, query)
+    if 'geometry' in df.columns:
+        #Create spatial Index 
+        sql_file_path = os.path.join(sql_base_path, 'create_spatial_index.sql')
+        query_template = read_sql_file(sql_file_path)
+        query = query_template.format(layer_name=table_name, schema_name='public')
+        conn = create_conn(database_name,host,port,user,password)
+        execute_query(conn, query)
 
     print('Table '+table_name+' imported')
 
@@ -212,6 +254,13 @@ def get_bbox_from_data(file_path, srid):
         df_4326 = df.to_crs(epsg=4326)
         return df_4326.total_bounds # (west, south, east, north)
     
+    elif file_path.endswith('.parquet'):
+        # For national Parquet, we peek at the columns to see if we can get a bbox
+        # Usually it's better to provide a bbox to the reader, but if we need to find it:
+        df = gpd.read_parquet(file_path)
+        df_4326 = df.to_crs(epsg=4326)
+        return df_4326.total_bounds
+
     elif file_path.endswith('.csv'):
         # Assume it has H3 indices (h3_origin or h3_index)
         df = pd.read_csv(file_path)
@@ -257,6 +306,10 @@ def download_osm(area, srid, type_network, bbox=None):
         
     # Reproject to the specified SRID
     features = features.to_crs(epsg=srid)
+
+    # --- Data Integrity Guard (#TS31) ---
+    if len(features) == 0:
+        raise ValueError(f"CRITICAL ERROR: No segments found for {type_network} in this area. Check internet connection or BBOX constraints.")
 
     # Return the result
     return features
@@ -407,22 +460,11 @@ def check_table_existence(conn, table_name):
         cursor.execute(query, (table_name,))
         return cursor.fetchone()[0]
 
-##Revisar location
 def handle_path_argument(type_network, path_arg, base_file_path, table_name, location_input, geom_type, srid, user, password, host, port, database_name, bbox=None):
     '''
-    Description: This function handles path input argument in three different ways based on its value
-    Input: path_arg - input argument which can be None, 'osm', or 'string_path'
-           location - the location used to form the table name
-           osm_file_path - the path of the base osm file
-           conn - database connection
-           table_name - the name of the table in the database
-           geom_type - the geometry type of the spatial data
-           user, password, host, port, database_name - database credentials
-           bbox - optional bounding box for spatial anchoring
-    Output: None, but has side effects like creating a table in the database
+    Input: bbox - optional bounding box for spatial anchoring and RAM optimization
     '''
-
-    conn = create_conn(database_name,host,port,user,password)
+    conn = create_conn(database_name, host, port, user, password)
 
     if path_arg is None or path_arg == 'None':
         print(f'Skipping {type_network} as no input was provided.')
@@ -433,15 +475,13 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
         if check_table_existence(conn, table_name):
             print(f'Table {table_name} already exists, skipping import.')
         else:
-            df_osm = read_csv_to_df(base_file_path)
+            df_osm = read_any_spatial_file(base_file_path)
             df_to_postgres(df_osm, table_name, geom_type, srid=srid,
                             user=user, password=password, host=host, 
                             port=port, database_name=database_name)
             print(f'Table {table_name} is loaded into database')
 
-    
     elif path_arg == 'osm':
-        # download_osm function should return the path to the downloaded file
         print(f'Processing {type_network} using OSM source')
         df_osm = download_osm(location_input, srid, type_network, bbox=bbox)
         print(f'uploading to db as {table_name}')
@@ -449,18 +489,46 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
                         user=user, password=password, host=host, 
                         port=port, database_name=database_name)
         print(f'{table_name} uploaded')
-        
 
     else:  # path_arg is a string path
-        print(f"Leyendo archivo ubicado en {path_arg}")
-        df_osm = read_csv_to_df(path_arg)
-        print(f'uploading from path argument to db')
-        if df_osm.geometry.type[0] == "Linestring":    
-            df_to_postgres(df_osm, table_name, geom_type, srid=srid,
-                            user=user, password=password, host=host, 
-                            port=port, database_name=database_name)
-        else:
-            df_osm = df_osm.explode()
-            df_to_postgres(df_osm, table_name, geom_type, srid=srid,
-                user=user, password=password, host=host, 
-                port=port, database_name=database_name)
+        print(f"Reading file located at {path_arg}")
+        df = read_any_spatial_file(path_arg, bbox=bbox)
+        
+        # Metadata Audit
+        # Map type_network to internal schema keys
+        type_to_schema = {
+            'census': 'INE_CENSO_2024',
+            'od': 'SECTRA_EOD'
+        }
+        source_type = type_to_schema.get(type_network)
+        
+        mapping = {}
+        if source_type:
+            mapping = diagnostic_handler.metadata_audit(source_type, df.columns.tolist())
+        
+        # If we have a mapping, we can rename columns to standard names for the DB
+        if mapping:
+            # Trip Scaling Logic: if both trips and expansion_factor exist, multiply them
+            if 'trips' in mapping and 'expansion_factor' in mapping:
+                t_col = mapping['trips']
+                e_col = mapping['expansion_factor']
+                df[t_col] = df[t_col] * df[e_col]
+                diagnostic_handler.report("DEMAND_SCALING", "INFO", f"Scaled {t_col} by {e_col}.")
+
+            # We only rename columns that were explicitly mapped
+            rename_dict = {v: k for k, v in mapping.items()}
+            df = df.rename(columns=rename_dict)
+            print(f"Mapped {len(mapping)} columns for {source_type}")
+
+        print(f'uploading from path argument to db as {table_name}')
+        
+        # If it's bike/osm and not LineString, explode it
+        if 'geometry' in df.columns and geom_type == 'LineString':
+            # Check if we need to explode
+            types = df.geometry.type.unique()
+            if 'MultiLineString' in types:
+                df = df.explode(index_parts=True)
+
+        df_to_postgres(df, table_name, geom_type, srid=srid,
+                        user=user, password=password, host=host, 
+                        port=port, database_name=database_name)
