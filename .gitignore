@@ -1,18 +1,30 @@
-shp_graph_metrics/data/raw/*
-shp_graph_metrics/data/processed/*
-shp_graph_metrics/output/*
-!shp_graph_metrics/data/raw/.gitkeep
-!shp_graph_metrics/data/processed/.gitkeep
-!shp_graph_metrics/output/.gitkeep
-*.Rhistory
-shp_graph_metrics/*.RData
-*.Rproj.user
-*.Rbuildignore
-.Rproj.user
-api/app/.env
+# +Ciclo Gitignore
+
+# Python & Environment
+__pycache__/
+*.py[cod]
+*$py.class
 .env
-api/data/app/__pycache__
-myenv
-.vscode
-cache
-cache
+myenv/
+.venv/
+api/app/.env
+
+# Local Resoures (Managed by Docker Volumes)
+data/*
+!data/.gitkeep
+cache/*
+!cache/.gitkeep
+
+# IDE & OS
+.vscode/
+.DS_Store
+.Rhistory
+*.RData
+*.Rproj.user
+
+# Legacy leftovers (already purged)
+Version 1/
+sheet_cheat.sh
+api/app/cache/
+api/app/data/
+api/app/test_output.log

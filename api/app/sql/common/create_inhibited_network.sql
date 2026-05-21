@@ -18,6 +18,7 @@ FROM
     ON ST_Intersects(a.geometry, b.geometry);
 
 -- 2. Segments OUTSIDE the danger zone (Safe parts of the street)
+-- FIXED: We use a LEFT JOIN / WHERE logic to ensure we only process segments once against the unioned buffer.
 DROP TABLE IF EXISTS network_without_impedance;
 CREATE TEMP TABLE network_without_impedance AS
 SELECT
@@ -26,13 +27,27 @@ SELECT
     a.highway,
     COALESCE(a.is_project, FALSE) as is_project
 FROM
-    {network_table} a,
-    total_inhib_buffer b;
+    {network_table} a
+CROSS JOIN 
+    total_inhib_buffer b
+WHERE ST_Intersects(a.geometry, b.geometry);
+
+-- 2.1 ADDITION: Segments that don't touch ANY buffer (Purely safe streets)
+INSERT INTO network_without_impedance
+SELECT 
+    geometry as geom_dump,
+    1.0 as impedance,
+    highway,
+    COALESCE(is_project, FALSE) as is_project
+FROM {network_table} a
+WHERE NOT EXISTS (
+    SELECT 1 FROM total_inhib_buffer b WHERE ST_Intersects(a.geometry, b.geometry)
+);
 
 -- 3. Final Consolidation (The Union of fragmented city parts)
 DROP TABLE IF EXISTS {result_name};
 CREATE TABLE {result_name} AS
-SELECT 
+SELECT DISTINCT ON (geometry) -- FINAL GUARD against overlapping fragments
     geom_dump as geometry,
     impedance,
     highway,
@@ -44,6 +59,7 @@ FROM (
 ) sub
 WHERE geom_dump IS NOT NULL 
   AND ST_GeometryType(geom_dump) = 'ST_LineString'
-  AND ST_Length(geom_dump) > 0.0001;
+  AND ST_Length(geom_dump) > 0.0001
+ORDER BY geometry, impedance DESC; -- Keep highest impedance if duplicates remain
 
 CREATE INDEX {result_name}_gix ON {result_name} USING GIST (geometry);

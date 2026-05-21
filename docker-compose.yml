@@ -21,7 +21,8 @@ services:
       dockerfile: Dockerfile_macos
     volumes:
       - ./api/app:/app
-      - ./api/data:/app/data
+      - ./data:/app/data
+      - ./cache:/app/cache
     environment:
       DATABASE_NAME: ${DATABASE_NAME}
       HOST: ${HOST}

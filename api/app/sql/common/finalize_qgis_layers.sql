@@ -33,9 +33,21 @@ FROM {h3_table};
 
 CREATE INDEX {scenario_prefix}_h3_gix ON {scenario_prefix}_h3 USING GIST (geometry);
 
--- 3. Cleanup Intermediate Tables (Optional but recommended for hygiene)
--- We keep them for now but we could DROP them here.
+-- 3. Create Master Ciclo Layer
+-- We provide the raw bike infrastructure as a clean layer for visualization.
+DROP TABLE IF EXISTS {scenario_prefix}_ciclo;
+CREATE TABLE {scenario_prefix}_ciclo AS
+SELECT 
+    geometry,
+    'existing_bike_path' as type
+FROM {ciclo_table};
 
+-- Attempt to add impedance if it was missing from raw data
+ALTER TABLE {scenario_prefix}_ciclo ADD COLUMN IF NOT EXISTS impedance FLOAT DEFAULT 0.5;
+
+CREATE INDEX {scenario_prefix}_ciclo_gix ON {scenario_prefix}_ciclo USING GIST (geometry);
+
+-- 4. Audit
 DO $$
 BEGIN
     RAISE NOTICE 'QGIS Master Layers finalized: %_network and %_h3', '{scenario_prefix}', '{scenario_prefix}';
