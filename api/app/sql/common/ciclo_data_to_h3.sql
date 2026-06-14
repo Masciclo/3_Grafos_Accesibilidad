@@ -8,7 +8,8 @@ from
 	{ciclo_table} ciclo,
 	{h3_table} h3
 where
-	st_intersects(ciclo.geometry,h3.geometry) = TRUE
+    ciclo.geometry && h3.geometry
+	AND st_intersects(ciclo.geometry,h3.geometry) = TRUE
 ORDER BY id_hex;
 
 alter table {h3_table}

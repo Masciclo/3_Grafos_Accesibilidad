@@ -4,20 +4,25 @@ import os
 import sys
 import argparse
 import select
+import time
+import threading
 from dotenv import load_dotenv
 import pandas as pd
 import geopandas as gpd
 from rich.console import Console
 from rich.live import Live
 from rich.prompt import Confirm
+from rich.panel import Panel
 
 # Modular Imports
-from ui.dashboard import PipelineUI, show_metadata_table, console
+from ui.dashboard import PipelineUI, RichProgressAdapter, console
 from ui.components import diagnostic_handler
-from infra.database import create_conn, execute_query, read_sql_file, check_table_existence
-from infra.ingestion import handle_path_argument, get_bbox_from_data, download_h3, extract_h3_grid_from_od
-from infra.metadata import metadata_audit
-from core import topology_refactor, routing, results
+from infra.database import create_conn, execute_query, check_table_existence
+from infra.ingestion import handle_path_argument, create_abbreviation
+from infra.metadata import metadata_audit, validate_hygienic_invariant
+from core.scenario import ScenarioEngine, ScenarioConfig
+from core.data_provider import DataProvider
+from core.telemetry import telemetry_manager
 
 # Force UTF-8 for Emojis
 sys.stdout.reconfigure(encoding='utf-8')
@@ -33,194 +38,208 @@ H3_LEVEL = os.getenv('H3_LEVEL')
 
 sql_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'sql', 'common')
 data_base_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data')
-
-def data_pipeline(osm_input, ciclo_input, location_input, srid, od_input, census_input, args, 
-                  internal_network_table, h3_table_name, osm_table_name, ciclo_table_name, 
-                  projects_table_name, census_table_name, inhibitor_table_name, desinhibitor_table_name, scenario_prefix):
-    
-    ui = PipelineUI(location_input, srid, args=args)
-    location_prefix = scenario_prefix.split('_')[0] # Usually the area abbreviation
-    
-    routing_task_id = None
-    agg_task_id = None
-
-    def ui_callback(phase_id, status, message=None, total=None):
-        nonlocal routing_task_id, agg_task_id
-        if phase_id:
-            ui.update_phase(phase_id, status)
-        
-        if status == "ADVANCE_ROUTING":
-            if routing_task_id is None:
-                routing_task_id = ui.progress.add_task("[bold magenta]Routing Demand", total=total)
-            ui.progress.advance(routing_task_id)
-        
-        if status == "ADVANCE_AGGREGATION":
-            if agg_task_id is None:
-                agg_task_id = ui.progress.add_task("[bold green]H3 Aggregation", total=6)
-            ui.progress.advance(agg_task_id)
-            if ui.progress.tasks[agg_task_id].finished:
-                ui.progress.remove_task(agg_task_id)
-
-        live.update(ui.get_dashboard_layout())
-
-    # Establish connection
-    conn = create_conn(DATABASE_NAME, HOST, PORT, USER, PASSWORD)
-
-    # Stage 0: Pre-flight Audit
-    console.print("[bold cyan]Stage 0: Pre-flight Audit[/]")
-    if not diagnostic_handler.check_environment(conn):
-        console.print("[bold red]Pre-flight audit failed. Check diagnostics above.[/]")
-        return
-
-    # Act 1: Living Landing (Confirmation Phase)
-    if not args.force_yes:
-        with Live(ui.get_landing_layout(), refresh_per_second=10, screen=False) as live:
-            while True:
-                live.update(ui.get_landing_layout())
-                rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
-                if rlist:
-                    sys.stdin.readline() 
-                    break
-    
-    # Metadata Audit Phase
-    census_columns = []
-    if census_input and census_input.endswith('.parquet'):
-        census_columns = pd.read_parquet(census_input, columns=[]).columns.tolist() 
-    elif census_input and census_input.endswith('.geojson'):
-        census_columns = gpd.read_file(census_input, rows=1).columns.tolist()
-        
-    od_columns = pd.read_csv(od_input, nrows=1).columns.tolist() if od_input else []
-    
-    census_mapping = metadata_audit("INE_CENSO_2024", census_columns)
-    od_mapping = metadata_audit("SECTRA_EOD", od_columns)
-    
-    show_metadata_table(census_mapping, od_mapping)
-    
-    if not args.force_yes:
-        if not Confirm.ask(f"\n[bold green]Metadata Mapped. Launch {location_input} ({args.scenario_id}) analysis?[/]"):
-            console.print("[yellow]Aborted.[/]")
-            return
-
-    # Act 2: Pipeline Execution
-    console.clear()
-    try:
-        with Live(ui.get_dashboard_layout(), refresh_per_second=10, screen=False) as live:
-            
-            # Stage 1: Ingestion
-            ui_callback(1, "RUNNING")
-            study_area_bbox = None
-            if census_input: study_area_bbox = get_bbox_from_data(census_input, srid)
-            elif od_input: study_area_bbox = get_bbox_from_data(od_input, srid)
-
-            handle_path_argument('osm', osm_input, os.path.join(data_base_path, 'highways.geojson'), osm_table_name, location_input, 'LineString', srid, USER, PASSWORD, HOST, PORT, DATABASE_NAME, bbox=study_area_bbox)
-            
-            bike_source = ciclo_input if ciclo_input else 'osm'
-            handle_path_argument('bike', bike_source, os.path.join(data_base_path, 'ciclo.geojson'), ciclo_table_name, location_input, 'LineString', srid, USER, PASSWORD, HOST, PORT, DATABASE_NAME, bbox=study_area_bbox)
-            
-            if not check_table_existence(conn, ciclo_table_name):
-                with conn.cursor() as cursor:
-                    cursor.execute(f"CREATE TABLE IF NOT EXISTS {ciclo_table_name} (geometry geometry(LineString, {srid}), impedance float)")
-                diagnostic_handler.report("EMPTY_CICLO_CREATED", "INFO", "No bike infrastructure found. Created empty table.")
-            
-            if args.projects_input:
-                handle_path_argument('projects', args.projects_input, None, projects_table_name, location_input, 'LineString', srid, USER, PASSWORD, HOST, PORT, DATABASE_NAME)
-            
-            if census_input:
-                handle_path_argument('census', census_input, None, census_table_name, location_input, 'MultiPolygon', srid, USER, PASSWORD, HOST, PORT, DATABASE_NAME, bbox=study_area_bbox)
-            ui_callback(1, "DONE ✅")
-            
-            # Stage 2: Topology Creation
-            ui_callback(2, "RUNNING")
-            execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_routing_topology.sql')).format(table=osm_table_name))
-            base_components_table = f'{osm_table_name}_components'
-            execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'calculate_components.sql')).format(topo_name=f'{osm_table_name}_vertices_pgr', result_table=base_components_table, table_name=osm_table_name))
-            diagnostic_handler.audit_network(conn, osm_table_name, base_components_table)
-            ui_callback(2, "DONE ✅")
-
-            # Stage 3: Grid Extraction
-            ui_callback(3, "RUNNING")
-            if od_input:
-                extract_h3_grid_from_od(od_input, h3_table_name, srid, USER, PASSWORD, HOST, PORT, DATABASE_NAME)
-            else:
-                download_h3(osm_table_name, h3_table_name, srid, H3_LEVEL, USER, PASSWORD, HOST, PORT, DATABASE_NAME)
-            ui_callback(3, "DONE ✅")
-
-            # Stage 4: Snapping (Placeholder)
-            ui.update_phase(4, "DONE ✅")
-
-            # Stage 5 & 6: Topology Refactoring (Modularized)
-            topology_refactor.run_topological_refactor(
-                conn, args, osm_table_name, projects_table_name, location_prefix, 
-                ciclo_table_name, internal_network_table, sql_base_path, callback=ui_callback
-            )
-
-            # Stage 7: Demand Routing (Modularized)
-            routing.run_demand_routing(
-                conn, args, internal_network_table, location_prefix, h3_table_name, 
-                sql_base_path, USER, PASSWORD, HOST, PORT, DATABASE_NAME, callback=ui_callback
-            )
-
-            # Stage 8: Aggregation & Delta (Modularized)
-            results.run_aggregation_and_delta(
-                conn, args, location_prefix, scenario_prefix, internal_network_table, h3_table_name, 
-                osm_table_name, ciclo_table_name, projects_table_name, census_table_name, 
-                od_input, census_input, sql_base_path, callback=ui_callback
-            )
-
-            # Stage 9: QGIS Finalization (Modularized)
-            results.finalize_qgis_layers(conn, scenario_prefix, internal_network_table, h3_table_name, ciclo_table_name, sql_base_path, callback=ui_callback)
-
-            ui.completed = True
-            ui.progress.update(ui.overall_task, completed=100)
-
-    except Exception as e:
-        if 'conn' in locals(): conn.rollback()
-        diagnostic_handler.report("PIPELINE_CRASH", "ERROR", f"Critical Failure: {str(e)}")
-        raise e
-    finally:
-        if args.cleanup and 'conn' in locals():
-            diagnostic_handler.report("CLEANUP", "INFO", "Removing intermediate tables...")
-            with conn.cursor() as cursor:
-                tables = [osm_table_name, f"{osm_table_name}_vertices_pgr", f"{osm_table_name}_components", 
-                          ciclo_table_name, projects_table_name, census_table_name, internal_network_table,
-                          f"{internal_network_table}_vertices_pgr", f"{internal_network_table}_components",
-                          h3_table_name, f"{scenario_prefix}_inhib_final", f"{scenario_prefix}_inhib_final_imp_buff"]
-                for t in tables:
-                    cursor.execute(f"DROP TABLE IF EXISTS {t} CASCADE")
-                conn.commit()
-        console.print(ui.get_dashboard_layout())
-    return 
+import json
+from core.academic_maps import AcademicMapGenerator
 
 def main():
     parser = argparse.ArgumentParser(description='+Ciclo: Advanced Demand-Based Routing Simulation')
-    parser.add_argument("--location", dest="location", required=True, type=str)
+    # ... (parser arguments remain same)
+    parser.add_argument("--location", dest="location", type=str, help="City name(s) or BBOX.")
     parser.add_argument("--scenario_id", dest="scenario_id", type=str, default="v1")
-    parser.add_argument("--srid", dest="srid", required=True, type=str)
+    parser.add_argument("--srid", dest="srid", type=str, help="Coordinate system. Optional if city is in semantic map.")
     parser.add_argument("--osm_input", dest="osm_input", type=str, default="osm")
     parser.add_argument("--ciclo_input", dest="ciclo_input", type=str)
     parser.add_argument("--od_input", dest="od_input", type=str)
-    parser.add_argument("--census_input", dest="census_input", type=str)
+    parser.add_argument("--census_input", dest="census_input", type=str, default="data/shared/census/chl/census_2024_pais.parquet")
     parser.add_argument("--projects_input", dest="projects_input", type=str)
     parser.add_argument("--reference_scenario", dest="reference_scenario", type=str)
     parser.add_argument("--yes", dest="force_yes", action="store_true")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true")
+    parser.add_argument("--mapping", dest="mapping", action="store_true", help="Generate interactive academic map suite.")
     parser.add_argument("--buffer_size", dest="buffer_size", type=int, default=15)
-    parser.add_argument("--imp_primary", dest="imp_primary", type=float, default=10.0)
-    parser.add_argument("--imp_secondary", dest="imp_secondary", type=float, default=5.0)
-    parser.add_argument("--imp_tertiary", dest="imp_tertiary", type=float, default=2.0)
-    parser.add_argument("--imp_local", dest="imp_local", type=float, default=1.0)
-    parser.add_argument("--imp_bike", dest="imp_bike", type=float, default=0.8)
+    parser.add_argument("--mr_distance", dest="mr_distance", type=float, default=5.0, help="Magnetismo a Referencia (Phase 18)")
+    parser.add_argument("--ma_distance", dest="ma_distance", type=float, default=7.0, help="Magnetismo a Antecesor (Phase 18)")
+    parser.add_argument("--zp_distance", dest="zp_distance", type=float, default=25.0, help="Zona de Proyecto Audit Clip (Phase 18)")
+    parser.add_argument("--imp_primary", dest="imp_primary", type=float, default=15.0)
+    parser.add_argument("--imp_secondary", dest="imp_secondary", type=float, default=7.0)
+    parser.add_argument("--imp_tertiary", dest="imp_tertiary", type=float, default=3.0)
+    parser.add_argument("--imp_local", dest="imp_local", type=float, default=1.5)
+    parser.add_argument("--imp_bike", dest="imp_bike", type=float, default=0.5)
     parser.add_argument("--inhibit", dest="inhibit", type=int, default=1)
-    parser.add_argument("--disinhit", dest="disinhit", type=int, default=1)
+    parser.add_argument("--disinhibit", dest="disinhibit", type=int, default=1)
 
     args = parser.parse_args()
-    from infra.ingestion import create_abbreviation
-    loc_pref = create_abbreviation(args.location)
-    sce_pref = f"{loc_pref}_{args.scenario_id}"
+    args.machine_hash = telemetry_manager.machine_hash # Inject for UI
+
+    # --- Phase 12: Interactive Session Loop ---
+    # Initialize Infrastructure
+    db_config = {'name': DATABASE_NAME, 'host': HOST, 'port': PORT, 'user': USER, 'password': PASSWORD}
+    engine = ScenarioEngine(db_config, sql_base_path, data_base_path)
     
-    data_pipeline(args.osm_input, args.ciclo_input, args.location, args.srid, args.od_input, args.census_input, args, 
-                  f"{sce_pref}_internal_net", f"{sce_pref}_internal_h3", f"{sce_pref}_osm_raw", f"{sce_pref}_ciclos", 
-                  f"{sce_pref}_projects", f"{sce_pref}_census", f"{sce_pref}_inhibitor", f"{sce_pref}_desinhibitor", sce_pref)
+    # Load Master Registry (CSV)
+    registry_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'infra', 'city_registry.csv')
+    census_base = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'shared', 'census')
+    
+    provider = DataProvider(registry_path, census_base, h3_level=int(H3_LEVEL or 9))
+
+    # Flag to check if we should exit after one run (CLI mode) or keep looping (Interactive mode)
+    interactive_mode = args.location is None
+
+    while True:
+        # Step 0: Consultation / Initial Prompt
+        if args.location is None:
+            temp_ui = PipelineUI("Initial Boot", "0000", args=args)
+            with Live(temp_ui.get_landing_layout(prompt_text="[bold yellow]ESPERANDO CONSULTA... PEGA O ESCRIBE ABAJO[/]"), refresh_per_second=10, console=console) as live:
+                from rich.prompt import Prompt
+                import re
+                raw_query = Prompt.ask("[bold green]+ciclo[/]").strip()
+                
+                if raw_query.lower() in ['exit', 'quit', 'q']:
+                    break
+
+                loc_match = re.search(r'--location\s*=\s*["\']?([^"\'\s]+)["\']?', raw_query)
+                if loc_match:
+                    args.location = loc_match.group(1).strip()
+                else:
+                    noise = ['docker', 'exec', 'it', 'python', 'python3', 'main.py', 'grafos-accesibilidad-ciclo-py-1', 'ciclo-py']
+                    clean_words = [w for w in raw_query.replace('\\', ' ').split() if not w.startswith('-') and w.lower() not in noise]
+                    args.location = clean_words[0] if clean_words else "valdivia"
+            
+            args.force_yes = False
+            args.scenario_id = "v13" 
+
+        # Step 1: Logo Animation (Plays for every run)
+        temp_ui = PipelineUI("Booting Scenario", "0000", args=args)
+        total_frames = len(temp_ui.animator.frames)
+        with Live(temp_ui.get_landing_layout(), refresh_per_second=20, console=console) as live:
+            for frame_idx in range(total_frames):
+                if select.select([sys.stdin], [], [], 0.0)[0]: break 
+                temp_ui.animator.current_frame = frame_idx
+                live.update(temp_ui.get_landing_layout(prompt_text="[bold dim]analizando factibilidad técnica...[/]"))
+                time.sleep(0.04)
+
+        locations = [loc.strip() for loc in args.location.split(",")]
+        
+        for current_loc in locations:
+            city_key = current_loc.split(',')[0].strip().lower()
+            city_meta = provider.get_city_meta(city_key) or {}
+            target_loc = city_meta.get("osm_name", current_loc)
+            target_srid = city_meta.get("srid", args.srid)
+            study_area_bbox = city_meta.get("bbox")
+
+            # --- DataProvider: Satisfy Pre-requisites ---
+            try:
+                validated_od = provider.satisfy_demand_matrix(city_key, target_srid, od_input_override=args.od_input)
+            except Exception as e:
+                console.print(f"[bold red]DataProvider Error:[/] {str(e)}")
+                continue
+
+            # --- SCREEN 2: Audit & Guard ---
+            if not args.force_yes:
+                ui = PipelineUI(target_loc, target_srid, args=args)
+                census_columns = []
+                if args.census_input and args.census_input.endswith('.parquet'):
+                    import pyarrow.parquet as pq
+                    census_columns = pq.read_schema(args.census_input).names
+                od_columns = pd.read_csv(validated_od, nrows=5).columns.tolist()
+                census_map = metadata_audit("INE_CENSO_2024", census_columns)
+                od_map = metadata_audit("SECTRA_EOD", od_columns)
+
+                # --- Task 13.1: Hygienic Invariant Enforcement ---
+                is_census_clean, missing_census = validate_hygienic_invariant("INE_CENSO_2024", census_map.keys())
+                is_od_clean, missing_od = validate_hygienic_invariant("SECTRA_EOD", od_map.keys())
+
+                spatial_status = "VALID"
+                if study_area_bbox:
+                    try:
+                        sample_h3 = pd.read_csv(validated_od, nrows=1)['h3_origin'].iloc[0]
+                        import h3
+                        lat, lon = h3.h3_to_coords(sample_h3)
+                        if not (study_area_bbox[0] <= lon <= study_area_bbox[2] and study_area_bbox[1] <= lat <= study_area_bbox[3]):
+                            spatial_status = "MISMATCH"
+                    except: pass
+
+                # --- Screen 2: Phase Budget & Audit ---
+                ui = PipelineUI(target_loc, target_srid, args=args)
+                
+                # Pre-calculate ETAs for the Audit screen (Budget View)
+                has_p = True if args.projects_input else False
+                stage_keys = {1: 'ingestion', 2: 'topo', 3: 'grid', 5: 'refactor', 7: 'routing', 8: 'agg', 9: 'final'}
+                for p in ui.phases:
+                    key = stage_keys.get(p["id"])
+                    if key:
+                        pred = telemetry_manager.predict_eta(args.osm_input, validated_od, has_p, stage=key)
+                        p["eta"] = telemetry_manager.format_eta(pred)
+
+                # Render the static audit layout
+                console.print(ui.get_audit_layout(census_map, od_map, spatial_status))
+                
+                from rich.prompt import Prompt
+                choice = Prompt.ask("[bold cyan]Choice (C: Continue, R: Redefine)[/]", choices=["C", "c", "R", "r"], show_choices=False).upper()
+                
+                if choice == "R":
+                    args.location = None 
+                    break
+                
+                if args.location is None: break 
+                
+                # --- Hard Stop: Hygienic Invariant Violation ---
+                if not is_census_clean or not is_od_clean:
+                    console.print("[bold red]Fatal Ingestion Failure:[/] Hygienic Invariant Violated.")
+                    if missing_census: console.print(f"   - Missing Census attributes: [bold]{', '.join(missing_census)}[/]")
+                    if missing_od: console.print(f"   - Missing OD attributes: [bold]{', '.join(missing_od)}[/]")
+                    args.location = None
+                    break
+
+                if spatial_status == "MISMATCH":
+                    console.print("[bold red]Hard Stop:[/] Spatial anchoring guard triggered.")
+                    args.location = None
+                    break
+
+            # --- SCREEN 3: ScenarioEngine Execution ---
+            config = ScenarioConfig(
+                location=target_loc, city_key=city_key, scenario_id=args.scenario_id, srid=int(target_srid),
+                osm_input=args.osm_input, od_input=validated_od, census_input=args.census_input,
+                ciclo_input=args.ciclo_input, projects_input=args.projects_input,
+                reference_scenario=args.reference_scenario, bbox=study_area_bbox,
+                buffer_size=args.buffer_size, imp_primary=args.imp_primary,
+                imp_secondary=args.imp_secondary, imp_tertiary=args.imp_tertiary,
+                imp_local=args.imp_local, imp_bike=args.imp_bike,
+                inhibit=bool(args.inhibit), disinhibit=bool(args.disinhibit),
+                cleanup=args.cleanup, mapping=args.mapping
+            )
+            
+            ui = PipelineUI(target_loc, target_srid, args=args)
+            observer = RichProgressAdapter(ui)
+            
+            # Start Heartbeat for adaptive dashboard
+            stop_heartbeat = threading.Event()
+            def heartbeat():
+                with Live(ui.get_dashboard_layout(), refresh_per_second=10, screen=False) as live:
+                    while not stop_heartbeat.is_set():
+                        live.update(ui.get_dashboard_layout())
+                        time.sleep(0.5)
+            
+            h_thread = threading.Thread(target=heartbeat, daemon=True)
+            h_thread.start()
+
+            try:
+                engine.run(config, observer)
+                ui.completed = True
+            except Exception as e:
+                diagnostic_handler.report("PIPELINE_CRASH", "ERROR", str(e))
+            finally:
+                stop_heartbeat.set()
+                h_thread.join(timeout=1)
+                console.print(ui.get_dashboard_layout())
+
+        # Post-execution logic
+        if interactive_mode:
+            # Task 13.8: Wait for user acknowledgment before returning to Screen 1
+            Prompt.ask("\n[bold yellow]Analysis Complete. Press [ENTER] to return to consultation...[/]")
+            args.location = None
+        else:
+            break
 
 if __name__=='__main__':
     main()

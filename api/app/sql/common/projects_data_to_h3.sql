@@ -11,7 +11,8 @@ from
 	{projects_table} p,
 	{h3_table} h3
 where
-	st_intersects(p.geometry,h3.geometry) = TRUE;
+    p.geometry && h3.geometry
+	AND st_intersects(p.geometry,h3.geometry) = TRUE;
 
 -- 2. Add column to master H3 table
 alter table {h3_table} add column if not exists m_project float default 0;

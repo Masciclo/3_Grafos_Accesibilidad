@@ -8,7 +8,8 @@ from
 	{osm_table} osm,
 	{h3_table} h3
 where
-	st_intersects(osm.geometry,h3.geometry) = TRUE
+    osm.geometry && h3.geometry
+	AND st_intersects(osm.geometry,h3.geometry) = TRUE
 ORDER BY id_hex;
 
 alter table {h3_table}

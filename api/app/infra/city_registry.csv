@@ -1,0 +1,10 @@
+city_key,country_code,srid_default,osm_name,bbox_w,bbox_s,bbox_e,bbox_n,ine_region_id
+santiago,CHL,32719,"Santiago, Chile",-70.9,-33.6,-70.4,-33.3,13
+valdivia,CHL,32718,"Valdivia, Chile",-73.3,-39.9,-73.1,-39.7,14
+concepcion,CHL,32718,"Concepción, Chile",-73.2,-37.0,-72.9,-36.6,08
+rancagua,CHL,32719,"Rancagua, Chile",-70.8,-34.25,-70.6,-34.1,06
+laserena,CHL,32719,"La Serena, Chile",-71.4,-30.0,-71.1,-29.8,04
+antofagasta,CHL,32719,"Antofagasta, Chile",-70.5,-23.8,-70.3,-23.5,02
+osorno,CHL,32718,"Osorno, Chile",-73.2,-40.65,-73.05,-40.5,10
+valparaiso,CHL,32719,"Valparaíso, Chile",-71.7,-33.15,-71.3,-32.9,05
+temuco,CHL,32718,"Temuco, Chile",-72.7,-38.8,-72.5,-38.6,09

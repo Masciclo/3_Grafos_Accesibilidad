@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS {result_table}_nodes;
 CREATE TABLE {result_table}_nodes AS
 SELECT node as id, component
 FROM pgr_connectedComponents(
-    'SELECT id, source, target, cost FROM {table_name}'
+    'SELECT id, source, target, ST_Length(geometry) as cost FROM {table_name}'
 );
 
 DROP TABLE IF EXISTS {result_table};

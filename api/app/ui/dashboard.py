@@ -1,6 +1,7 @@
 import time
 import sys
 import os
+from typing import Optional, Dict
 from rich.console import Console, Group
 from rich.layout import Layout
 from rich.panel import Panel
@@ -19,59 +20,70 @@ class PipelineUI:
         self.banner_path = os.path.join(os.path.dirname(__file__), "assets", "banner.json")
         self.animator = BannerAnimator(self.banner_path)
         self.completed = False
-        self.stop_animation = False
         
-        self.phases = [
-            {"id": 1, "name": "Data Ingestion", "status": "PENDING", "start": None, "end": None, "eta": "~1m"},
-            {"id": 2, "name": "Topology Creation", "status": "PENDING", "start": None, "end": None, "eta": "~30s"},
-            {"id": 3, "name": "Grid Extraction", "status": "PENDING", "start": None, "end": None, "eta": "~10s"},
-            {"id": 4, "name": "H3 Snapping", "status": "PENDING", "start": None, "end": None, "eta": "~45s"},
-            {"id": 5, "name": "Network Inhibition", "status": "PENDING", "start": None, "end": None, "eta": "~1m"},
-            {"id": 6, "name": "Intermodal Merging", "status": "PENDING", "start": None, "end": None, "eta": "~20s"},
-            {"id": 7, "name": "Demand Routing", "status": "PENDING", "start": None, "end": None, "eta": "Auto"},
-            {"id": 8, "name": "H3 Aggregation", "status": "PENDING", "start": None, "end": None, "eta": "~1m"},
-            {"id": 9, "name": "QGIS Finalization", "status": "PENDING", "start": None, "end": None, "eta": "~5s"}
+        # --- Task 13.9: Conditional Phase Registration ---
+        is_comparison = bool(getattr(args, "reference_scenario", None) or getattr(args, "projects_input", None))
+        
+        all_phases = [
+            {"id": 1, "name": "Data Ingestion", "steps": 4},
+            {"id": 2, "name": "Topology Creation", "steps": 2},
+            {"id": 3, "name": "Grid Extraction", "steps": 100}, # Percentage-based
+            {"id": 4, "name": "H3 Snapping", "steps": 1, "optional": True},
+            {"id": 5, "name": "Refactorización de la Topología", "steps": 6},
+            {"id": 6, "name": "Intermodal Merging", "steps": 1, "optional": True},
+            {"id": 7, "name": "Demand Routing", "steps": 100}, # Origins-based
+            {"id": 8, "name": "H3 Aggregation", "steps": 6},
+            {"id": 9, "name": "Cierre Analítico y Auditoría", "steps": 2}
         ]
         
+        self.phases = [p for p in all_phases if not p.get("optional") or is_comparison]
+        
+        # Unified Progress System
         self.progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(bar_width=None),
+            SpinnerColumn(spinner_name="dots", style="bold cyan"),
+            TextColumn("[progress.description]{task.description}", justify="left"),
+            BarColumn(bar_width=20, pulse_style="cyan"),
             TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
             TimeElapsedColumn()
         )
-        self.overall_task = self.progress.add_task("[bold yellow]Overall Progress", total=100)
+        
+        # Initialize Task IDs for each phase
+        for p in self.phases:
+            p["task_id"] = self.progress.add_task(p["name"], total=p["steps"], visible=False)
+            p["status"] = "PENDING"
+            p["start"] = None
+            p["end"] = None
+            p["eta"] = "Auto"
 
-    def update_phase(self, phase_id, status="RUNNING"):
+        self.overall_task = self.progress.add_task("[bold yellow]OVERALL SIMULATION", total=len(self.phases))
+
+    def update_phase(self, phase_id, status="RUNNING", increment=0, total=None):
         now = time.time()
         for p in self.phases:
             if p["id"] == phase_id:
                 p["status"] = status
-                if status == "RUNNING": 
-                    p["start"] = now
+                task = self.progress._tasks[p["task_id"]]
+                
+                if status == "RUNNING":
+                    if not p["start"]: p["start"] = now
+                    self.progress.update(p["task_id"], visible=True)
+                
+                if increment > 0:
+                    self.progress.advance(p["task_id"], advance=increment)
+                
+                if total:
+                    self.progress.update(p["task_id"], total=total)
+
                 if "DONE" in status:
                     p["end"] = now
-            elif p["id"] < phase_id and "DONE" not in p["status"]:
-                p["status"] = "DONE ✅"
-                p["end"] = now if p["start"] else None
+                    self.progress.update(p["task_id"], completed=task.total)
+                    self.progress.update(self.overall_task, advance=1)
 
     def format_time(self, seconds):
         if seconds is None: return "--"
-        return f"{int(seconds)}s"
-
-    def make_phase_table(self):
-        table = Table(box=None, expand=True)
-        table.add_column("#", style="dim", width=2)
-        table.add_column("Stage", style="cyan", width=25)
-        table.add_column("Status", justify="center", width=12)
-        table.add_column("Elapsed", justify="right", style="dim")
-        table.add_column("ETA", justify="right", style="dim")
-        for p in self.phases:
-            elapsed = self.format_time(p["end"] - p["start"]) if p["start"] and p["end"] else (self.format_time(time.time() - p["start"]) if p["start"] else "")
-            style = "green" if "DONE" in p["status"] else "orange1" if "RUNNING" in p["status"] else "dim"
-            status_text = "RUNNING 🏃" if p["status"] == "RUNNING" else p["status"]
-            table.add_row(str(p["id"]), p["name"], f"[{style}]{p['status'] if 'DONE' in p['status'] else status_text}[/]", elapsed, p["eta"])
-        return table
+        if seconds < 60:
+            return f"{int(seconds)}s"
+        return f"{int(seconds // 60)}m {int(seconds % 60)}s"
 
     def make_config_table(self):
         table = Table(title="[bold cyan]Pipeline Configuration", border_style="cyan", box=None)
@@ -79,59 +91,187 @@ class PipelineUI:
         table.add_column("Value", style="white")
         if self.args:
             table.add_row("Location", self.location)
-            table.add_row("Scenario", self.args.scenario_id)
+            table.add_row("Scenario", getattr(self.args, "scenario_id", "v1"))
             table.add_row("SRID", str(self.srid))
-            table.add_row("Inhibition", "Enabled" if self.args.inhibit else "Disabled")
+            
+            # Use getattr for optional/new flags to prevent crashes
+            inhibit_status = "Enabled" if getattr(self.args, "inhibit", True) else "Disabled"
+            table.add_row("Inhibition", inhibit_status)
         return table
 
-    def get_landing_layout(self):
+    def get_landing_layout(self, prompt_text=None):
         layout = Layout()
         layout.split_column(
-            Layout(name="banner", ratio=4),
-            Layout(name="middle", ratio=2),
+            Layout(name="banner", ratio=1),
             Layout(name="prompt", size=3)
         )
-        layout["middle"].split_row(
-            Layout(Panel(self.make_config_table(), border_style="cyan")),
-            Layout(Panel(diagnostic_handler.get_input_table(self.args.od_input if self.args else None, self.args.census_input if self.args else None, self.args.projects_input if self.args else None), border_style="blue"))
+        layout["banner"].update(
+            Panel(
+                Text(self.animator.get_next_frame(), justify="center", style="green"), 
+                border_style="green", 
+                padding=(2, 2)
+            )
         )
-        layout["banner"].update(Panel(Text(self.animator.get_next_frame(), justify="center", style="green"), title="[bold green]+CICLO SYSTEM READY", border_style="green", padding=(1,2)))
-        layout["prompt"].update(Panel("[bold cyan]PRESS ENTER TO AUDIT METADATA...[/]", border_style="blink bold cyan", padding=(0,2)))
+        
+        display_text = prompt_text if prompt_text else "[bold green]esperando consulta...[/]"
+        layout["prompt"].update(Panel(display_text, border_style="green", padding=(0, 2)))
         return layout
+
+    def get_audit_layout(self, census_map, od_map, spatial_status="VALID"):
+        # Meta Table
+        meta_table = Table(box=None, expand=True)
+        meta_table.add_column("Dataset", style="bold cyan")
+        meta_table.add_column("Attribute", style="blue")
+        meta_table.add_column("Mapped Column", style="green")
+        for k, v in census_map.items(): meta_table.add_row("Census", k, v)
+        for k, v in od_map.items(): meta_table.add_row("Demand", k, v)
+        
+        # Phase Budget Table
+        budget_table = Table(box=None, expand=True)
+        budget_table.add_column("#", style="dim")
+        budget_table.add_column("Planned Stage", style="bold")
+        budget_table.add_column("Predicted ETA", style="yellow")
+        for p in self.phases:
+            budget_table.add_row(str(p["id"]), p["name"], p["eta"])
+
+        guard_style = "green" if spatial_status == "VALID" else "red"
+        guard_msg = "[bold green]✓ SPATIAL ANCHORING VALIDATED:[/] Data extent matches requested BBOX." if spatial_status == "VALID" else "[bold red]⚠ SPATIAL ANCHORING GUARD:[/] Data extent MISMATCH detected. Ghost simulation risk."
+        
+        from rich.align import Align
+        controls = "[bold green][C] Launch Analysis[/] | [bold yellow][R] Redefine Parameters[/] | [bold red][Ctrl+C] Abort[/]"
+        
+        return Group(
+            Panel(f"[bold blue]SCREEN 2: Pre-flight Audit Monitoring[/] [dim]Area: {self.location} | Scenario: {getattr(self.args, 'scenario_id', 'v1')}[/]", border_style="blue"),
+            Group(
+                Panel(meta_table, title="[bold]Metadata Standardization", border_style="green"),
+                Panel(budget_table, title="[bold]Estimated Phase Budget", border_style="yellow")
+            ),
+            Panel(guard_msg, title="[bold]Safety Guard", border_style=guard_style),
+            Panel(Align.center(controls), border_style="dim")
+        )
 
     def get_dashboard_layout(self):
         layout = Layout()
         layout.split_column(
-            Layout(name="header", size=3),
+            Layout(name="header", size=1),
             Layout(name="body", ratio=1),
-            Layout(name="diagnostics", size=10),
-            Layout(name="footer", size=3)
+            Layout(name="telemetry", size=4),
+            Layout(name="diagnostics", size=5),
+            Layout(name="footer", size=1)
         )
-        layout["header"].update(Panel(f"[bold white on blue] +CICLO ENGINE ACTIVE: {self.location} [/] [bold cyan] SCENARIO: {self.args.scenario_id} [/] [bold cyan] SRID: {self.srid} [/]", border_style="blue"))
-        layout["body"].split_row(
-            Layout(Panel(self.make_phase_table(), title="[bold]Stages", border_style="cyan"), ratio=2),
-            Layout(Panel(self.progress, title="[bold]Process Monitoring", border_style="magenta"), ratio=1)
-        )
-        diag_list = []
-        for d in diagnostic_handler.diagnostics[-5:]:
-            diag_list.append(Text.from_markup(f"{d['emoji']} [{d['color']} BOLD]{d['level']}:[/] {d['message']}"))
-        if not diag_list: diag_list = [Text("Monitoring live telemetry...", style="dim")]
-        layout["diagnostics"].update(Panel(Group(*diag_list), title="[bold yellow]Diagnostic Feed", border_style="yellow"))
+        # Compact Header
+        header_text = Text.from_markup(f" [bold white on blue] +CICLO [/] [bold blue] Mission Control: {self.location} [/] [dim]|[/] [cyan] Scenario: {self.args.scenario_id} [/]")
+        layout["header"].update(header_text)
         
-        footer_msg = "[bold green]Pipeline Completed Successfully! 🎉[/]" if self.completed else "[italic]Engine processing architectural hooks...[/]"
-        footer_style = "green" if self.completed else "dim"
-        layout["footer"].update(Panel(footer_msg, border_style=footer_style))
+        # --- Body: Unified Engineering Panel ---
+        # 1. Overall Header
+        overall_table = self.progress.make_tasks_table([self.progress._tasks[self.overall_task]])
+        
+        # 2. Granular Status Table with Inline Progress
+        status_table = Table(box=None, expand=True, padding=(0, 1))
+        status_table.add_column("#", style="dim", width=2)
+        status_table.add_column("Operational Stage", style="bold white", width=25)
+        status_table.add_column("Progress", width=30)
+        status_table.add_column("Status", justify="center")
+        status_table.add_column("Elapsed", justify="right", style="dim")
+        status_table.add_column("ETA", style="cyan")
+
+        for p in self.phases:
+            # DYNAMIC TIMER LOGIC
+            elapsed_val = None
+            if p["status"] == "RUNNING" and p["start"]:
+                elapsed_val = time.time() - p["start"]
+            elif "DONE" in p["status"] and p["start"] and p["end"]:
+                elapsed_val = p["end"] - p["start"]
+            
+            elapsed_str = self.format_time(elapsed_val) if elapsed_val else "--"
+            status_style = "green" if "DONE" in p["status"] else "bold yellow" if "RUNNING" in p["status"] else "dim"
+            
+            # Inline Progress Bar
+            task = self.progress._tasks[p["task_id"]]
+            inline_bar = self.progress.make_tasks_table([task]) if p["status"] != "PENDING" else "[dim]........[/]"
+
+            status_table.add_row(
+                str(p["id"]),
+                p["name"],
+                inline_bar,
+                f"[{status_style}]{p['status']}[/]",
+                elapsed_str,
+                p["eta"]
+            )
+
+        layout["body"].update(Panel(
+            Group(
+                Panel(overall_table, border_style="yellow", title="[bold]Overall Mission Status"),
+                status_table
+            ), 
+            title="[bold blue]Analytical Pipeline", 
+            border_style="blue"
+        ))
+
+        # Telemetry-Rich Metrics
+        metrics = Table.grid(expand=True, padding=(0, 2))
+        mem = diagnostic_handler.get_mem_usage()
+        metrics.add_row(
+            f" [dim]RAM:[/] [bold]{mem:.1f} MB[/]", 
+            f" [dim]DB:[/] [green]Active[/]",
+            f" [dim]Machine:[/] [bold]{getattr(self.args, 'machine_hash', 'unknown')[:8]}[/]", 
+            f" [dim]Model:[/] [bold]Log-Log[/]"
+        )
+        layout["telemetry"].update(Panel(metrics, title="[bold yellow]System Metrics", border_style="yellow"))
+
+        diag_list = []
+        for d in diagnostic_handler.diagnostics[-3:]:
+            diag_list.append(Text.from_markup(f" {d['emoji']} [dim]{d['level']}:[/] {d['message']}"))
+        if not diag_list: diag_list = [Text(" Monitoring live telemetry...", style="dim")]
+        layout["diagnostics"].update(Panel(Group(*diag_list), title="[bold dim]Diagnostic Feed", border_style="dim"))
+        
+        footer_msg = Text.from_markup(f" [bold green]✓ Pipeline Completed Successfully! 🎉[/]" if self.completed else " [italic dim]Processing architectural hooks...[/]")
+        layout["footer"].update(footer_msg)
         return layout
 
-def show_metadata_table(census_map, od_map):
-    table = Table(title="[bold green]Intelligent Metadata Mapping", border_style="green")
-    table.add_column("Component", style="bold cyan")
-    table.add_column("Parameter", style="blue")
-    table.add_column("Detected Column", style="green")
-    
-    for k, v in census_map.items():
-        table.add_row("Census (INE)", k, v)
-    for k, v in od_map.items():
-        table.add_row("Demand (SECTRA)", k, v)
+from core.scenario import ProgressSeam
+
+class RichProgressAdapter(ProgressSeam):
+    """
+    RichProgressAdapter: Bridges ScenarioEngine events to the Rich Dashboard.
+    """
+    def __init__(self, ui: PipelineUI):
+        self.ui = ui
+        self.routing_task_id = None
+        self.agg_task_id = None
+        self.refactor_task_id = None
+
+    def on_stage_start(self, stage_id: int, name: str, eta: str = "Auto"):
+        # Safe lookup for pruned phases
+        target = next((p for p in self.ui.phases if p["id"] == stage_id), None)
+        if target:
+            target["eta"] = eta
+        self.ui.update_phase(stage_id, "RUNNING")
+
+    def on_stage_end(self, stage_id: int, success: bool = True):
+        status = "DONE ✅" if success else "FAILED ❌"
+        self.ui.update_phase(stage_id, status)
+
+    def on_progress_update(self, *args, **kwargs):
+        # Handle variable positional arguments from different modules
+        # Some modules pass (pid, status), some just (status)
+        status = args[0] if len(args) == 1 else args[1] if len(args) > 1 else None
+        increment = kwargs.get('increment', 0)
+        total = kwargs.get('total')
+
+        # Map generic signals to Phase IDs
+        signal_to_id = {
+            "ADVANCE_ROUTING": 7,
+            "ADVANCE_REFACTOR": 5,
+            "ADVANCE_AGGREGATION": 8
+        }
         
-    console.print(Panel(table, border_style="green"))
+        phase_id = signal_to_id.get(status)
+        if phase_id:
+            self.ui.update_phase(phase_id, "RUNNING", increment=increment, total=total)
+        elif status == "ADVANCE_GRID": # Task 13.9: H3 Grid specific
+            self.ui.update_phase(3, "RUNNING", increment=increment, total=total)
+
+    def report_diagnostic(self, level: str, message: str):
+        diagnostic_handler.report("ENGINE", level, message)

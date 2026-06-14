@@ -8,7 +8,8 @@ from
 	{component_table} components,
 	{h3_table} h3
 where
-	st_intersects(components.the_geom,h3.geometry) = TRUE
+    components.the_geom && h3.geometry
+	AND st_intersects(components.the_geom,h3.geometry) = TRUE
 ORDER BY id_hex;
 
 -- Ensure columns exist in the target table

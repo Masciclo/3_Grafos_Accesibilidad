@@ -14,6 +14,7 @@ from
 	{h3_table} h3
 where
 	n.od_flow > 0
+    AND n.geometry && h3.geometry
 	AND st_intersects(n.geometry,h3.geometry) = TRUE;
 
 -- 2. Add columns to master H3 table

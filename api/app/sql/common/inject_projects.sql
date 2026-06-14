@@ -1,26 +1,20 @@
 -- inject_projects.sql
--- Phase 5: Injects new project geometries into the base network.
+-- Phase 15.8: Executes Project Injection without premature amputation.
+-- Amputation is now handled by topology_refactor.py AFTER suturing.
 
--- 1. Identify "New" geometries (those not matched by spatial_match_projects.sql)
--- We insert geometries from projects_table that are NOT within 10m of any ALREADY matched edge.
--- This prevents double-injection of existing roads.
-
-INSERT INTO {network_table} (geometry, highway, is_project, impedance)
+-- 1. Inject sovereign geometries
+INSERT INTO {network_table} (geometry, highway, is_project, project_id, impedance)
 SELECT 
-    p.geometry,
+    (ST_Dump(ST_MakeValid(p.geometry))).geom as geometry,
     'project_new' as highway,
     TRUE as is_project,
-    1.0 as impedance
-FROM {projects_table} p
-WHERE NOT EXISTS (
-    SELECT 1 
-    FROM {network_table} n 
-    WHERE ST_DWithin(p.geometry, n.geometry, 10)
-    AND n.is_project = TRUE
-);
+    p.id as project_id,
+    0.5 as impedance 
+FROM {projects_table} p;
 
 -- 2. Audit
 DO $$
 BEGIN
-    RAISE NOTICE 'New project geometries injected into the network.';
+    RAISE NOTICE 'Project injection complete. Total project edges: %', 
+        (SELECT COUNT(*) FROM {network_table} WHERE is_project = TRUE);
 END $$;

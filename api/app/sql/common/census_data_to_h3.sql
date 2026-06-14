@@ -13,7 +13,8 @@ FROM
     {census_table} c,
     {h3_table} h3
 WHERE
-    ST_Intersects(c.geometry, h3.geometry) = TRUE;
+    c.geometry && h3.geometry
+    AND ST_Intersects(c.geometry, h3.geometry) = TRUE;
 
 -- 2. Add column to master H3 table
 ALTER TABLE {h3_table} ADD COLUMN IF NOT EXISTS pop_total FLOAT DEFAULT 0;

@@ -7,7 +7,7 @@ DO $$
 DECLARE
     target_component_id integer;
     lcc_exists boolean;
-    snap_threshold_val float := 250.0; -- Default threshold in meters
+    snap_threshold_val float := 500.0; -- Aumentado de 250m a 500m
     total_cells integer;
     loss_count integer;
     loss_pct numeric;
@@ -26,8 +26,18 @@ BEGIN
         ORDER BY count(*) DESC
         LIMIT 1;
         RAISE NOTICE 'LCC detectado (ID: %). Snapping restringido a red conectada.', target_component_id;
+        
+        -- PRE-FILTER LCC NODES for massive speedup
+        CREATE TEMP TABLE lcc_vertices AS
+        SELECT v.id, v.the_geom
+        FROM {network_table}_vertices_pgr v
+        JOIN {components_table}_nodes c ON c.id = v.id
+        WHERE c.component = target_component_id;
+        CREATE INDEX lcc_vertices_gix ON lcc_vertices USING GIST (the_geom);
     ELSE
         RAISE WARNING 'Components table not found. Snapping to ANY node (Risk of disconnected routing).';
+        CREATE TEMP TABLE lcc_vertices AS SELECT id, the_geom FROM {network_table}_vertices_pgr;
+        CREATE INDEX lcc_vertices_gix ON lcc_vertices USING GIST (the_geom);
     END IF;
 
     -- 3. Create Mapping Table: H3 -> Node
@@ -35,7 +45,7 @@ BEGIN
     CREATE TABLE {location_prefix}_h3_to_node AS
     WITH h3_centroids AS (
         SELECT 
-            h3_index, 
+            h3_index::text, 
             ST_Centroid(geometry) as geom
         FROM {h3_table}
     )
@@ -51,13 +61,7 @@ BEGIN
     FROM h3_centroids h
     CROSS JOIN LATERAL (
         SELECT id, the_geom, ST_Distance(h.geom, the_geom) as dist
-        FROM {network_table}_vertices_pgr v
-        WHERE 
-            -- If LCC exists, filter by it
-            (NOT lcc_exists OR EXISTS (
-                SELECT 1 FROM {components_table}_nodes c 
-                WHERE c.id = v.id AND c.component = target_component_id
-            ))
+        FROM lcc_vertices v
         ORDER BY h.geom <-> v.the_geom
         LIMIT 1
     ) n;

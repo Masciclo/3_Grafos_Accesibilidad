@@ -11,8 +11,10 @@ SELECT
     n.highway,
     n.impedance,
     COALESCE(n.is_project, FALSE) as is_project,
+    n.project_id,
     COALESCE(n.od_flow, 0) as od_flow,
-    (COALESCE(n.od_flow, 0) / NULLIF(ST_Length(n.geometry), 0)) as cost_effective
+    (COALESCE(n.od_flow, 0) / NULLIF(ST_Length(n.geometry), 0)) as cost_effective,
+    TRUE as participating_in_analysis
 FROM {network_table} n;
 
 CREATE INDEX {scenario_prefix}_net_gix ON {scenario_prefix}_network USING GIST (geometry);
@@ -28,7 +30,8 @@ SELECT
     COALESCE(pop_total, 0) as pop_total,
     COALESCE(od_flow, 0) as od_flow,
     COALESCE(m_osm, 0) as m_osm,
-    COALESCE(m_project, 0) as m_project
+    COALESCE(m_project, 0) as m_project,
+    TRUE as participating_in_analysis
 FROM {h3_table};
 
 CREATE INDEX {scenario_prefix}_h3_gix ON {scenario_prefix}_h3 USING GIST (geometry);

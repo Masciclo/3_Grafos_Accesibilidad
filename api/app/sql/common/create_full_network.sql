@@ -13,59 +13,79 @@ WITH cycleway_geoms AS (
     {filters}
 ),
 osm_filtered AS (
-    -- DEDUPLICATION LOGIC:
-    -- Take road segments only if they are NOT redundant with a project geometry.
-    -- Redundancy = Within 0.5 meters AND > 80% linear overlap.
+    -- DEDUPLICATION LOGIC OPTIMIZED:
+    -- Use BBOX operator (&&) to leverage spatial index.
+    -- Use a simpler distance check to skip heavy ST_Intersection/ST_Buffer.
     SELECT
         (ST_Dump(ST_MakeValid(b.geometry))).geom as geometry,
         b.impedance as impedance,
         b.highway as highway,
-        b.is_project as is_project
+        b.is_project as is_project,
+        b.project_id as project_id,
+        b.parent_baseline_id as parent_baseline_id
     FROM
         {osm} AS b
-    WHERE NOT EXISTS (
+    WHERE b.is_project = TRUE -- NEVER filter out projects, they represent the sovereign state
+       OR NOT EXISTS (
         SELECT 1 FROM cycleway_geoms c 
-        WHERE ST_DWithin(b.geometry, c.geometry, 0.5)
-          AND ST_Length(ST_Intersection(b.geometry, ST_Buffer(c.geometry, 0.5))) / NULLIF(ST_Length(b.geometry), 0) > 0.8
+        WHERE b.geometry && ST_Expand(c.geometry, 0.5) -- BBOX Filter First
+          AND ST_DWithin(b.geometry, c.geometry, 0.5) -- Fast distance check
     )
 ),
 dumped_geoms AS (
-    SELECT * FROM cycleway_geoms
+    SELECT 
+        geometry, 
+        impedance, 
+        highway, 
+        is_project,
+        NULL::text as project_id,
+        NULL::integer as parent_baseline_id
+    FROM cycleway_geoms
     UNION ALL
     SELECT * FROM osm_filtered
 ),
 normalized_geoms AS (
-    -- FINAL DEDUPLICATION: Handle reversed OSM duplicates (e.g. 764 vs 765)
-    -- We force all lines to follow a deterministic vertex order
+    -- FINAL DEDUPLICATION: Handle reversed OSM duplicates
+    -- Use MD5 Hash of the binary geometry for ultra-fast comparison
     SELECT DISTINCT ON (
-        CASE 
-            WHEN ST_StartPoint(geometry) < ST_EndPoint(geometry) THEN ST_AsBinary(geometry)
-            ELSE ST_AsBinary(ST_Reverse(geometry))
-        END
+        MD5(ST_AsBinary(
+            CASE 
+                WHEN ST_StartPoint(geometry) < ST_EndPoint(geometry) THEN geometry
+                ELSE ST_Reverse(geometry)
+            END
+        ))
     )
     geometry,
-    -- Case: If it is a project, force the low impedance. Otherwise keep road penalty.
+    -- PROTECT SOVEREIGN IMPEDANCE: 
+    -- If it's a project, keep its assigned impedance (Strictly 0.5 for +Ciclo).
     CASE 
-        WHEN is_project = TRUE THEN {bike_impedance} 
+        WHEN is_project = TRUE THEN 0.5
+        WHEN highway = 'cycleway' THEN {bike_impedance}
         ELSE impedance 
     END as impedance,
     highway,
-    is_project
+    is_project,
+    project_id,
+    parent_baseline_id
     FROM dumped_geoms
     WHERE geometry IS NOT NULL 
       AND ST_GeometryType(geometry) = 'ST_LineString'
       AND ST_Length(geometry) > 0.0001
     ORDER BY 
-        CASE 
-            WHEN ST_StartPoint(geometry) < ST_EndPoint(geometry) THEN ST_AsBinary(geometry)
-            ELSE ST_AsBinary(ST_Reverse(geometry))
-        END,
-        is_project DESC, -- Favor project version if both exist
-        impedance ASC    -- Favor lower cost if duplicates remain
+        MD5(ST_AsBinary(
+            CASE 
+                WHEN ST_StartPoint(geometry) < ST_EndPoint(geometry) THEN geometry
+                ELSE ST_Reverse(geometry)
+            END
+        )), 
+        impedance DESC
 )
 SELECT * FROM normalized_geoms;
 
+-- Standard pgRouting columns
 ALTER TABLE {result_name} ADD COLUMN id SERIAL PRIMARY KEY;
+ALTER TABLE {result_name} ADD COLUMN source integer;
+ALTER TABLE {result_name} ADD COLUMN target integer;
 ALTER TABLE {result_name} ADD COLUMN length float;
 ALTER TABLE {result_name} ADD COLUMN cost float;
 

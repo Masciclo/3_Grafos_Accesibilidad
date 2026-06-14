@@ -1,0 +1,68 @@
+{
+    "chile_cities": {
+        "santiago": {
+            "bbox": [-70.9, -33.6, -70.4, -33.3],
+            "sectra_drive_mdb": "193675NwL6QNDs6VJFHU0mXiX5-6SdBPJ",
+            "sectra_drive_zones": "1SM2C5b3jhbmYCbAkmtg2yWRU2dMQkGRl",
+            "ine_region_id": "13",
+            "osm_name": "Santiago, Chile",
+            "srid": 32719
+        },
+        "valdivia": {
+            "bbox": [-73.3, -39.9, -73.1, -39.7],
+            "sectra_drive_mdb": "1hppBvHgQKTwpBHaLnJhucIhLzTf_71b7",
+            "sectra_drive_zones": "1bUsrB81VtJdOBsWA0UW-y0ww_BlKJmGN",
+            "ine_region_id": "14",
+            "osm_name": "Valdivia, Chile",
+            "srid": 32718
+        },
+        "concepcion": {
+            "bbox": [-73.2, -37.0, -72.9, -36.6],
+            "sectra_drive_mdb": "1EXQluFde8evC11rZPrhSRxihiRcIzJjQ",
+            "sectra_drive_zones": "1o1DToSzpXMH0ll9SfrEnTfDKC4UQ8AKM",
+            "ine_region_id": "08",
+            "osm_name": "Concepción, Chile",
+            "srid": 32718
+        },
+        "rancagua": {
+            "bbox": [-70.8, -34.25, -70.6, -34.1],
+            "sectra_drive_mdb": "1aa04acb9-f348-4599-8b3e-68e415512de5",
+            "sectra_drive_zones": "rancagua_zones_id",
+            "ine_region_id": "06",
+            "osm_name": "Rancagua, Chile",
+            "srid": 32719
+        },
+        "laserena": {
+            "bbox": [-71.4, -30.0, -71.1, -29.8],
+            "sectra_drive_mdb": "18G2aaiabEhei9uwFYmq9_cyA6ZhLSKrC",
+            "sectra_drive_zones": "1FJswYidjkpw5CTWCpUWT5HRpRhyVp-Le",
+            "ine_region_id": "04",
+            "osm_name": "La Serena, Chile",
+            "srid": 32719
+        },
+        "antofagasta": {
+            "bbox": [-70.5, -23.8, -70.3, -23.5],
+            "sectra_drive_mdb": "1EXQluFde8evC11rZPrhSRxihiRcIzJjQ",
+            "sectra_drive_zones": "1o1DToSzpXMH0ll9SfrEnTfDKC4UQ8AKM",
+            "ine_region_id": "02",
+            "osm_name": "Antofagasta, Chile",
+            "srid": 32719
+        },
+        "osorno": {
+            "bbox": [-73.2, -40.65, -73.05, -40.5],
+            "sectra_drive_mdb": "1hlA-LGT_bXHbCF45cCFLyXu756SUuaRn",
+            "sectra_drive_zones": "1g_0UsTL2VR0yhX7eiugFRPl6ImR1Kclg",
+            "ine_region_id": "10",
+            "osm_name": "Osorno, Chile",
+            "srid": 32718
+        },
+        "valparaiso": {
+            "bbox": [-71.7, -33.15, -71.3, -32.9],
+            "sectra_drive_mdb": "1-vLIsT_Z1mD1-6C7Y4x_Gg9K2n3pD8o5",
+            "sectra_drive_zones": "1z3f5G7h9j2k4l6m8n0pQWERTyuIOPA1s",
+            "ine_region_id": "05",
+            "osm_name": "Valparaíso, Chile",
+            "srid": 32719
+        }
+    }
+}

@@ -15,7 +15,7 @@ def run_demand_routing(conn, args, internal_network_table, location_prefix, h3_t
 
     if args.od_input:
         # Re-calculate components on the final full network before snapping
-        execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_routing_topology.sql')).format(table=internal_network_table))
+        execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_routing_topology.sql')).format(table=internal_network_table, tolerance=0.1))
         execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'calculate_components.sql')).format(topo_name=f'{internal_network_table}_vertices_pgr', result_table=full_components_table, table_name=internal_network_table))
         
         execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'snap_h3_to_network.sql')).format(location_prefix=scenario_prefix, network_table=internal_network_table, h3_table=h3_table_name, components_table=full_components_table))
@@ -25,9 +25,12 @@ def run_demand_routing(conn, args, internal_network_table, location_prefix, h3_t
             snapped = cursor.fetchone()[0]
             cursor.execute(f"SELECT count(*) FROM {scenario_prefix}_h3_to_node")
             total = cursor.fetchone()[0]
-            diagnostic_handler.report("SNAPPING_METRICS", "INFO", f"Coverage: {(snapped/total)*100:.1f}%")
+            diagnostic_handler.report("SNAPPING_METRICS", "INFO" if snapped > 0 else "ERROR", f"Graph Snapping: {snapped}/{total} cells connected ({(snapped/total)*100 if total > 0 else 0:.1f}%)")
+            
+            if snapped == 0:
+                diagnostic_handler.report("H3_MISMATCH", "ERROR", "CRITICAL: No H3 cells from demand matrix matched the current grid. Check H3 Resolutions.")
 
-    execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_routing_topology.sql')).format(table=internal_network_table))
+    execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_routing_topology.sql')).format(table=internal_network_table, tolerance=0.1))
 
     if args.od_input:
         if callback: callback(7, "RUNNING", "Routing Demand")
@@ -46,30 +49,49 @@ def run_demand_routing(conn, args, internal_network_table, location_prefix, h3_t
                 d.node_id as target_node,
                 SUM(m.trips) as total_trips
             FROM {od_table_name} m
-            JOIN {scenario_prefix}_h3_to_node o ON m.h3_origin = o.h3_index
-            JOIN {scenario_prefix}_h3_to_node d ON m.h3_dest = d.h3_index
+            JOIN {scenario_prefix}_h3_to_node o ON m.h3_origin::text = o.h3_index::text
+            JOIN {scenario_prefix}_h3_to_node d ON m.h3_dest::text = d.h3_index::text
             WHERE o.is_coverage_loss = false AND d.is_coverage_loss = false
             GROUP BY o.node_id, d.node_id;
         """)
 
+        # --- ROBUST BATCH ROUTING ---
+        execute_query(conn, "SET work_mem = '128MB';")
         execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'betweenness_init.sql')).format(network_table=internal_network_table))
 
+        # Get list of unique origins to process in chunks
         with conn.cursor() as cursor:
-            cursor.execute(f"SELECT DISTINCT source_node FROM {consolidated_table}")
-            origins = [row[0] for row in cursor.fetchall()]
+            cursor.execute(f"SELECT DISTINCT source_node FROM {scenario_prefix}_node_demand_consolidated")
+            all_origins = [row[0] for row in cursor.fetchall()]
 
-        query_template_step = read_sql_file(os.path.join(sql_base_path, 'od_routing_step.sql'))
+        diagnostic_handler.report("BATCH_ROUTING", "INFO", f"Executing A* Routing for {len(all_origins)} origins in chunks of 500...")
         
-        # We handle the loop here, and use the callback for the progress bar if provided
-        for origin_id in origins:
-            execute_query(conn, query_template_step.format(
-                network_table=internal_network_table, 
-                location_prefix=scenario_prefix, 
-                origin_id=origin_id, 
-                edge_weight_column='cost', 
-                directed='false'
-            ))
-            if callback: callback(None, "ADVANCE_ROUTING", total=len(origins))
+        chunk_size = 500
+        query_template = read_sql_file(os.path.join(sql_base_path, 'od_routing_step_astar.sql'))
+
+        for i in range(0, len(all_origins), chunk_size):
+            chunk = all_origins[i:i + chunk_size]
+            
+            # Process each origin in the chunk
+            # Note: We use a smaller loop here but it's still server-side pgr_aStar
+            # The key is that we can COMMIT after each chunk.
+            for origin_id in chunk:
+                execute_query(conn, query_template.format(
+                    network_table=internal_network_table,
+                    location_prefix=scenario_prefix,
+                    origin_id=origin_id,
+                    edge_weight_column='cost',
+                    directed='false'
+                ))
+            
+            # Explicit commit after each chunk to free DB resources
+            conn.commit()
+            
+            if callback: 
+                callback(None, "ADVANCE_ROUTING", total=len(all_origins))
+            
+            if (i // chunk_size) % 5 == 0:
+                print(f"     * Routed {i + len(chunk)}/{len(all_origins)} origins...")
 
         execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'demand_finalize.sql')).format(network_table=internal_network_table))
 

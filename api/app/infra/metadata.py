@@ -7,7 +7,7 @@ CHILEAN_SCHEMAS = {
         "age_0_14": ["P01_1", "EDAD_0_14"],
         "age_65_plus": ["P01_3", "EDAD_65_MAS"],
         "households": ["HOGARES", "TOTAL_HOG"],
-        "geometry": ["geometry", "geom"]
+        "geometry": ["geometry", "geom", "SHAPE"]
     },
     "SECTRA_EOD": {
         "trips": ["trips", "VIAJES", "n_viajes", "Viajes_Totales"],
@@ -18,6 +18,21 @@ CHILEAN_SCHEMAS = {
         "h3_dest": ["h3_dest", "h3_destination", "DESTINO_H3", "Zona_Destino"]
     }
 }
+
+# HYGIENIC INVARIANTS: Columns that MUST exist for the engine to function.
+INDISPENSABLE_COLUMNS = {
+    "INE_CENSO_2024": ["pop_total", "geometry"],
+    "SECTRA_EOD": ["h3_origin", "h3_dest", "trips"]
+}
+
+def validate_hygienic_invariant(source_name, mapped_keys):
+    '''
+    Verification: Ensures that all indispensable columns for a given source are mapped.
+    Returns: (bool, list_of_missing)
+    '''
+    indispensable = INDISPENSABLE_COLUMNS.get(source_name, [])
+    missing = [col for col in indispensable if col not in mapped_keys]
+    return len(missing) == 0, missing
 
 def metadata_audit(source_name, columns):
     '''
