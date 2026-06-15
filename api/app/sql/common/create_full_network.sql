@@ -42,7 +42,14 @@ dumped_geoms AS (
         NULL::integer as parent_baseline_id
     FROM cycleway_geoms
     UNION ALL
-    SELECT * FROM osm_filtered
+    SELECT 
+        geometry, 
+        impedance, 
+        highway, 
+        is_project,
+        project_id::text as project_id,
+        parent_baseline_id::integer as parent_baseline_id
+    FROM osm_filtered
 ),
 normalized_geoms AS (
     -- FINAL DEDUPLICATION: Handle reversed OSM duplicates

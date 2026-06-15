@@ -75,6 +75,11 @@ FROM fragments f
 WHERE r.edge_id = f.id;
 
 -- 5. FINAL CALCULATION: Delta Flow
+-- Rule B Implementation: Projects without matches are Innovation (Delta = Flow)
+UPDATE {result_table} 
+SET participating_in_analysis = TRUE
+WHERE is_project = TRUE;
+
 UPDATE {result_table} 
 SET delta_flow = flow_current - flow_baseline;
 

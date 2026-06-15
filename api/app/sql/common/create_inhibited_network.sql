@@ -69,9 +69,13 @@ SELECT DISTINCT ON (geometry) -- FINAL GUARD against overlapping fragments
     project_id,
     parent_baseline_id
 FROM (
-    SELECT * FROM network_with_impedance
+    SELECT 
+        geom_dump, impedance, highway, is_project, project_id, parent_baseline_id 
+    FROM network_with_impedance
     UNION ALL
-    SELECT * FROM network_without_impedance
+    SELECT 
+        geom_dump, impedance, highway, is_project, project_id, parent_baseline_id 
+    FROM network_without_impedance
 ) sub
 WHERE ST_GeometryType(geom_dump) = 'ST_LineString'
   AND ST_Length(geom_dump) > 0.0001
