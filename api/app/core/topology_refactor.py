@@ -15,45 +15,96 @@ def run_topological_refactor(conn, args, osm_table_name, projects_table_name, lo
     zp_dist = getattr(args, 'zp_distance', 25.0) 
 
     # --- Stage 5.1: High-Fidelity Invariant Prep ---
-    execute_query(conn, f"ALTER TABLE {osm_table_name} ADD COLUMN IF NOT EXISTS is_project BOOLEAN DEFAULT FALSE;")
-    execute_query(conn, f"ALTER TABLE {osm_table_name} ADD COLUMN IF NOT EXISTS project_id TEXT;")
-    execute_query(conn, f"ALTER TABLE {osm_table_name} ADD COLUMN IF NOT EXISTS parent_baseline_id INTEGER;") 
-    execute_query(conn, f"ALTER TABLE {osm_table_name} ADD COLUMN IF NOT EXISTS impedance DOUBLE PRECISION DEFAULT 1.0;")
+    SchemaGuard.ensure_network_parity(conn, osm_table_name)
 
     # --- Stage 5.2: ASSIMILATIVE REFACTORING ---
     if args.projects_input:
-        diagnostic_handler.report("REFACTOR", "INFO", f"Executing Iterative Assimilation (MR={mr_dist}m, ZP={zp_dist}m)...")
+        diagnostic_handler.report("REFACTOR", "INFO", f"Executing Adaptive Suturing (MR={mr_dist}m, ZP={zp_dist}m)...")
         
-        assim_buffers = "temp_assimilation_buffers"
-        execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_assimilation_buffers.sql')).format(
-            result_table=assim_buffers,
-            projects_table=projects_table_name,
-            mr_distance=mr_dist
-        ))
+        # 1. Identify project archetypes (Single-Edge vs Multi-Edge)
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT id, COUNT(*) FROM {projects_table_name} GROUP BY id")
+            stats = cur.fetchall()
+            single_edge_pids = [row[0] for row in stats if row[1] == 1]
+            multi_edge_pids = [row[0] for row in stats if row[1] > 1]
 
+        # 2. Track A: Standard Iterative Shatter (for Multi-Edge)
         assimilated_segments = "temp_assimilated_segments"
-        execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'resolve_assimilation_conflicts.sql')).format(
-            result_table=assimilated_segments,
-            baseline_table=osm_table_name,
-            buffers_table=assim_buffers
-        ))
+        if multi_edge_pids:
+            diagnostic_handler.report("SHATTER", "INFO", f"Applying iterative shatter to {len(multi_edge_pids)} multi-edge projects...")
+            
+            # Format IDs for SQL IN clause (e.g. 1,2,3)
+            multi_ids_str = ",".join(map(str, multi_edge_pids))
 
-        # 2. Apply Assimilation & Innovation
-        execute_query(conn, f"DELETE FROM {osm_table_name} WHERE id IN (SELECT parent_baseline_id FROM {assimilated_segments});")
-        
-        # Use ST_Dump to ensure LineString compatibility
-        execute_query(conn, f"""
-            INSERT INTO {osm_table_name} (geometry, highway, is_project, project_id, parent_baseline_id, impedance) 
-            SELECT (ST_Dump(ST_MakeValid(geometry))).geom, 'project_assimilated', TRUE, project_id, parent_baseline_id, 0.5 
-            FROM {assimilated_segments};
-        """)
-        
-        execute_query(conn, f"""
-            INSERT INTO {osm_table_name} (geometry, highway, is_project, project_id, impedance) 
-            SELECT (ST_Dump(ST_MakeValid(p.geometry))).geom, 'project_innovation', TRUE, p.id, 0.5 
-            FROM {projects_table_name} p 
-            WHERE NOT EXISTS (SELECT 1 FROM {assimilated_segments} s WHERE s.project_id = p.id);
-        """)
+            # Use temp table for filtered projects with dumped geometries and index
+            execute_query(conn, f"""
+                DROP TABLE IF EXISTS multi_edge_projects; 
+                CREATE TEMP TABLE multi_edge_projects AS 
+                SELECT (ST_Dump(ST_MakeValid(geometry))).geom as geometry, id as id 
+                FROM {projects_table_name} 
+                WHERE id IN ({multi_ids_str});
+                CREATE INDEX multi_edge_projects_gix ON multi_edge_projects USING GIST (geometry);
+            """)
+            
+            assim_buffers = "temp_assimilation_buffers"
+            execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'create_assimilation_buffers.sql')).format(
+                result_table=assim_buffers,
+                projects_table="multi_edge_projects",
+                mr_distance=mr_dist
+            ))
+
+            execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'resolve_assimilation_conflicts.sql')).format(
+                result_table=assimilated_segments,
+                baseline_table=osm_table_name,
+                buffers_table=assim_buffers
+            ))
+
+            # Apply Assimilation
+            execute_query(conn, f"DELETE FROM {osm_table_name} WHERE id IN (SELECT parent_baseline_id FROM {assimilated_segments});")
+            execute_query(conn, f"""
+                INSERT INTO {osm_table_name} (geometry, highway, is_project, project_id, parent_baseline_id, impedance) 
+                SELECT geometry, 'project_assimilated', TRUE, project_id::text, parent_baseline_id, 0.5 
+                FROM {assimilated_segments};
+            """)
+            
+            # Innovation for multi-edge: only those segments that didn't significantly overlap with baseline
+            execute_query(conn, f"""
+                INSERT INTO {osm_table_name} (geometry, highway, is_project, project_id, impedance) 
+                SELECT p.geometry, 'project_innovation', TRUE, p.id::text, 0.5 
+                FROM multi_edge_projects p 
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM {assimilated_segments} s 
+                    WHERE s.project_id::bigint = p.id 
+                      AND ST_Intersects(p.geometry, s.geometry)
+                      AND ST_Length(ST_Intersection(p.geometry, s.geometry)) > 0.5 * ST_Length(p.geometry)
+                );
+            """)
+        else:
+            # Create empty table if no multi-edge projects exist to avoid downstream errors
+            execute_query(conn, f"CREATE TEMP TABLE {assimilated_segments} (project_id TEXT, parent_baseline_id TEXT, geometry GEOMETRY);")
+
+        # 3. Track B: Nodalized Sutura Pattern (for Single-Edge)
+        if single_edge_pids:
+            diagnostic_handler.report("SUTURA", "INFO", f"Applying Nodalized Sutura to {len(single_edge_pids)} single-edge projects...")
+            
+            single_ids_str = ",".join(map(str, single_edge_pids))
+
+            # Bulk Insert as Innovation first
+            execute_query(conn, f"""
+                INSERT INTO {osm_table_name} (geometry, highway, is_project, project_id, impedance) 
+                SELECT (ST_Dump(ST_MakeValid(geometry))).geom, 'project_innovation', TRUE, id::text, 0.5 
+                FROM {projects_table_name} WHERE id IN ({single_ids_str});
+            """)
+            
+            # Sequential high-fidelity linking
+            for pid in single_edge_pids:
+                execute_query(conn, read_sql_file(os.path.join(sql_base_path, 'link_single_edge_project.sql')).format(
+                    network_table=osm_table_name,
+                    pid=pid,
+                    mr_distance=mr_dist,
+                    zp_distance=zp_dist
+                ))
+
 
     # --- Stage 5.4: INHIBITION (Impedance Surface) ---
     if callback: callback(None, "ADVANCE_REFACTOR") 
