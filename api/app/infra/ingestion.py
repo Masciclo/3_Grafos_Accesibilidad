@@ -1,4 +1,6 @@
 import os
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Any
 import pandas as pd
 import geopandas as gpd
 import osmnx as ox
@@ -11,6 +13,7 @@ import json
 from infra.database import create_conn, df_to_postgres, check_table_existence, stream_file_to_postgres
 from infra.metadata import metadata_audit
 from ui.components import diagnostic_handler
+from core.pipeline import ScenarioConfig
 
 # --- Task: Bypass Rate Limits & Handle Scale ---
 # Main Overpass server - Optimized with VPN and Precise BBOX
@@ -130,8 +133,15 @@ import osmnx as ox
 ox.settings.overpass_endpoint = "https://overpass-api.de/api/interpreter"
 ox.settings.timeout = 600
 ox.settings.requests_timeout = 600
+ox.settings.useful_tags_way = list(set(ox.settings.useful_tags_way) | {'cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both', 'bicycle'})
 
 def download_osm(area, srid, type_network, bbox=None):
+    # --- Task: SRID Robustness Handshake ---
+    try:
+        srid = int(srid) if str(srid).lower() != 'none' else 4326
+    except (ValueError, TypeError):
+        srid = 4326
+
     # --- Priority 1: Explicit BBOX ---
     if bbox is not None:
         west, south, east, north = bbox
@@ -203,8 +213,25 @@ def download_osm(area, srid, type_network, bbox=None):
         lines['highway'] = lines['highway'].apply(normalize_highway)
         
     elif type_network == 'bike':
-        lines = lines[lines['highway'] == 'cycleway']
+        # Keep both dedicated cycleways and ways with cycleway attribute tags
+        filter_mask = (lines['highway'] == 'cycleway')
+        for col in ['cycleway', 'cycleway:left', 'cycleway:right', 'cycleway:both']:
+            if col in lines.columns:
+                filter_mask = filter_mask | lines[col].notna()
+        if 'bicycle' in lines.columns:
+            filter_mask = filter_mask | (lines['bicycle'] == 'designated')
+        lines = lines[filter_mask]
     
+    # Sanitize column names (replace colons with underscores) and guarantee schema fields exist
+    lines = lines.rename(columns={
+        'cycleway:left': 'cycleway_left',
+        'cycleway:right': 'cycleway_right',
+        'cycleway:both': 'cycleway_both'
+    })
+    for col in ['cycleway', 'cycleway_left', 'cycleway_right', 'cycleway_both', 'bicycle']:
+        if col not in lines.columns:
+            lines[col] = None
+            
     return lines.to_crs(epsg=srid)
 
 def extract_h3_grid_from_od(od_file_path, h3_table_name, srid, user, password, host, port, database_name, callback=None):
@@ -239,17 +266,23 @@ def extract_h3_grid_from_od(od_file_path, h3_table_name, srid, user, password, h
     if callback: callback(None, "ADVANCE_GRID", increment=30)
     return count
 
-def download_h3(base_table, h3_table_name, srid, res, user, password, host, port, database_name, callback=None):
+def download_h3(base_table, h3_table_name, srid, res, user, password, host, port, database_name, callback=None, conn=None):
     """
     Description: Generates an exact H3 grid by polyfilling the actual geometries in the base table.
     """
     if callback: callback(None, "ADVANCE_GRID", increment=10)
-    from sqlalchemy import create_engine
-    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
     
-    # 1. Load the actual geometries from the base table
-    sql = f'SELECT geometry FROM {base_table}'
-    gdf = gpd.read_postgis(sql, engine, geom_col='geometry')
+    from sqlalchemy import create_engine
+    
+    # We must use an engine for geopandas read_postgis/to_postgis.
+    # If a raw psycopg2 conn was passed, we ignore it and use the engine.
+    if conn and hasattr(conn, 'execute'):
+        engine = conn
+    else:
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
+        
+    gdf = gpd.read_postgis(f'SELECT geometry FROM {base_table}', engine, geom_col='geometry')
+    
     if callback: callback(None, "ADVANCE_GRID", increment=20)
     
     # 2. Project to WGS84 for H3 library
@@ -257,6 +290,11 @@ def download_h3(base_table, h3_table_name, srid, res, user, password, host, port
     if callback: callback(None, "ADVANCE_GRID", increment=10)
     
     h3_indices = set()
+    try:
+        h3_res = int(res) if str(res).lower() != 'none' else 9
+    except (ValueError, TypeError):
+        h3_res = 9
+
     for geom in gdf_4326.geometry:
         if geom.is_empty: continue
         
@@ -264,10 +302,10 @@ def download_h3(base_table, h3_table_name, srid, res, user, password, host, port
         if geom.geom_type == 'MultiPolygon':
             for poly in geom.geoms:
                 polygon_dict = json.loads(geojson.dumps(poly))
-                h3_indices.update(h3.polyfill(polygon_dict, res=int(res), geo_json_conformant=True))
+                h3_indices.update(h3.polyfill(polygon_dict, res=h3_res, geo_json_conformant=True))
         else:
             polygon_dict = json.loads(geojson.dumps(geom))
-            h3_indices.update(h3.polyfill(polygon_dict, res=int(res), geo_json_conformant=True))
+            h3_indices.update(h3.polyfill(polygon_dict, res=h3_res, geo_json_conformant=True))
     
     if callback: callback(None, "ADVANCE_GRID", increment=30)
             
@@ -282,12 +320,25 @@ def download_h3(base_table, h3_table_name, srid, res, user, password, host, port
         h3_gdf = h3_gdf.to_crs(epsg=srid)
     
     if callback: callback(None, "ADVANCE_GRID", increment=10)
+    
     h3_gdf.to_postgis(name=h3_table_name, con=engine, if_exists='replace')
+        
     if callback: callback(None, "ADVANCE_GRID", increment=10)
     print(f"   - [Grid] Generated {len(h3_indices)} hexagons covering the {base_table} geometry.")
 
-def handle_path_argument(type_network, path_arg, base_file_path, table_name, location_input, geom_type, srid, user, password, host, port, database_name, bbox=None):
-    conn = create_conn(database_name, host, port, user, password)
+def handle_path_argument(type_network, path_arg, base_file_path, table_name, location_input, geom_type, srid, user, password, host, port, database_name, bbox=None, conn=None):
+    # --- Task: SRID Robustness Handshake ---
+    if srid is None or str(srid).lower() == 'none' or str(srid).strip() == '':
+        srid = 4326
+    else:
+        try:
+            srid = int(srid)
+        except (ValueError, TypeError):
+            srid = 4326
+
+    if not conn:
+        conn = create_conn(database_name, host, port, user, password)
+    
     if path_arg is None or path_arg == 'None': return
 
     # STRATEGY: High-Performance Ogr2ogr Streaming for large GeoJSON
@@ -338,4 +389,172 @@ def handle_path_argument(type_network, path_arg, base_file_path, table_name, loc
         if 'MultiLineString' in df.geometry.type.unique() or 'MultiPolygon' in df.geometry.type.unique():
             df = df.explode(index_parts=True)
 
-    df_to_postgres(df, table_name, geom_type, srid=srid, user=user, password=password, host=host, port=port, database_name=database_name)
+    df_to_postgres(df, table_name, geom_type, srid=srid, user=user, password=password, host=host, port=port, database_name=database_name, conn=conn)
+
+
+def resolve_single_file_by_extension(folder_path: str, extension) -> str:
+    """
+    Scans folder_path for files ending with extension (case-insensitive).
+    - If 0 files found: raises FileNotFoundError.
+    - If 1 file found: returns its absolute path.
+    - If > 1 files found: raises ValueError listing the duplicates.
+    """
+    if not os.path.exists(folder_path):
+        raise FileNotFoundError(f"Directory not found: {folder_path}")
+        
+    if isinstance(extension, str):
+        extensions = (extension.lower(),)
+    else:
+        extensions = tuple(e.lower() for e in extension)
+        
+    files = [f for f in os.listdir(folder_path) if any(f.lower().endswith(ext) for ext in extensions)]
+    
+    if len(files) == 0:
+        raise FileNotFoundError(f"Data Resolution Error: No files matching extensions {extension} found in {folder_path}")
+    elif len(files) == 1:
+        return os.path.join(folder_path, files[0])
+    else:
+        raise ValueError(f"Ambiguous File Selection: Multiple matching files found in {folder_path}: {files}. Please retain only the correct target file in this directory.")
+
+
+@dataclass(frozen=True)
+class IngestionManifest:
+    """
+    Metadata receipt returned upon successful ingestion.
+    Provides downstream tasks with resolved table names and record counts.
+    """
+    resolved_srid: int
+    resolved_bbox: Optional[List[float]]
+    ingested_tables: Dict[str, str]
+    record_counts: Dict[str, int]
+
+
+class DataIngestor:
+    """
+    Deep module handling discovery, auditing, and streaming of raw spatial data.
+    """
+    def __init__(self, conn: Any, db_config: Dict[str, Any], observer: Optional[Any] = None):
+        self.conn = conn
+        self.db_config = db_config
+        self.observer = observer
+
+    def _get_table_count(self, table_name: str) -> int:
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                return cursor.fetchone()[0]
+        except Exception:
+            return 0
+
+    def _validate_bbox_overlap(self, bbox: List[float], table_name: str) -> None:
+        """
+        Ensures that the study area bbox has physical overlap with the ingested table's geometry.
+        """
+        xmin, ymin, xmax, ymax = bbox
+        bbox_geom_wkt = f"ST_MakeEnvelope({xmin}, {ymin}, {xmax}, {ymax}, 4326)"
+        
+        query = f"""
+            SELECT EXISTS (
+                SELECT 1 FROM {table_name}
+                WHERE ST_Intersects(geometry, ST_Transform({bbox_geom_wkt}, ST_SRID(geometry)))
+                LIMIT 1
+            );
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(query)
+                row = cursor.fetchone()
+                if row and not row[0]:
+                    raise ValueError(f"Spatial Invariant Violation: Bounding Box envelope {bbox} does not intersect with any geometry in table '{table_name}'. Please verify the study area coordinates.")
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise e
+            pass
+
+    def ingest(self, config: ScenarioConfig, tables: Dict[str, str]) -> IngestionManifest:
+        """
+        Executes the multi-dataset ingestion pipeline based on the ScenarioConfig.
+        """
+        user = self.db_config.get('user')
+        password = self.db_config.get('password')
+        host = self.db_config.get('host')
+        port = self.db_config.get('port')
+        db = self.db_config.get('name')
+        
+        srid = config.srid
+        bbox = config.bbox
+        location = config.location
+        
+        record_counts = {}
+        
+        # 1. Ingest OSM Baseline Network (V1)
+        if config.osm_input:
+            if self.observer: 
+                self.observer.report_diagnostic("INGESTION", "INFO", f"Ingesting OSM street network for '{location}'...")
+            handle_path_argument(
+                'osm', config.osm_input, None, tables['osm'], location, 'LineString', srid,
+                user, password, host, port, db, bbox=bbox, conn=self.conn
+            )
+            record_counts['osm'] = self._get_table_count(tables['osm'])
+            
+        # 2. Ingest Cycleway Infrastructure
+        bike_source = config.ciclo_input or (config.osm_input if (config.osm_input and os.path.exists(config.osm_input)) else 'osm')
+        if bike_source:
+            if self.observer: 
+                self.observer.report_diagnostic("INGESTION", "INFO", "Ingesting bike cycleways network...")
+            handle_path_argument(
+                'bike', bike_source, None, tables['ciclo'], location, 'LineString', srid,
+                user, password, host, port, db, bbox=bbox, conn=self.conn
+            )
+            record_counts['ciclo'] = self._get_table_count(tables['ciclo'])
+            
+        # 3. Ingest Study Travel Zones (Dynamic Shapefile scanning)
+        zones_folder = f"data/{config.city_key}/raw/{config.city_key}_zones"
+        try:
+            zones_path = resolve_single_file_by_extension(zones_folder, '.shp')
+            if self.observer: 
+                self.observer.report_diagnostic("INGESTION", "INFO", f"Ingesting administrative zones from: {zones_path}")
+            handle_path_argument(
+                'zones', zones_path, None, tables['zones'], location, 'MultiPolygon', srid,
+                user, password, host, port, db, conn=self.conn
+            )
+            record_counts['zones'] = self._get_table_count(tables['zones'])
+            
+            # Run Spatial Overlap Guard if explicit bbox is defined
+            if bbox:
+                self._validate_bbox_overlap(bbox, tables['zones'])
+        except Exception as e:
+            if self.observer: 
+                self.observer.report_diagnostic("INGESTION", "ERROR", f"Failure during study zones ingestion: {e}")
+            raise e
+            
+        # 4. Ingest Census Blocks
+        if config.census_input:
+            if self.observer: 
+                self.observer.report_diagnostic("INGESTION", "INFO", f"Ingesting census blocks from: {config.census_input}")
+            handle_path_argument(
+                'census', config.census_input, None, tables['census'], location, 'MultiPolygon', srid,
+                user, password, host, port, db, bbox=bbox, conn=self.conn
+            )
+            record_counts['census'] = self._get_table_count(tables['census'])
+            
+            # Run Spatial Overlap Guard if explicit bbox is defined
+            if bbox:
+                self._validate_bbox_overlap(bbox, tables['census'])
+            
+        # 5. Ingest Proposed Interventions (Projects)
+        if config.projects_input:
+            if self.observer: 
+                self.observer.report_diagnostic("INGESTION", "INFO", f"Ingesting project segments from: {config.projects_input}")
+            handle_path_argument(
+                'projects', config.projects_input, None, tables['projects'], location, 'LineString', srid,
+                user, password, host, port, db, conn=self.conn
+            )
+            record_counts['projects'] = self._get_table_count(tables['projects'])
+
+        return IngestionManifest(
+            resolved_srid=srid,
+            resolved_bbox=bbox,
+            ingested_tables=tables,
+            record_counts=record_counts
+        )

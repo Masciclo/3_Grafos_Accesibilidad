@@ -49,8 +49,7 @@ BEGIN
             ctx.project_id,
             ctx.parent_baseline_id,
             ctx.impedance
-        FROM nodalized n
-        JOIN snapped_context ctx ON ST_Within(ST_Centroid(n.g), ST_Buffer(ctx.geometry, 0.01));
+        JOIN snapped_context ctx ON ST_DWithin(ST_LineInterpolatePoint(n.g, 0.5), ctx.geometry, 0.02);
     END IF;
 END $$;
 

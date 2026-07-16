@@ -15,6 +15,7 @@ class SchemaGuard:
         "impedance": "FLOAT DEFAULT 1.0",
         "od_flow": "NUMERIC DEFAULT 0",
         "highway": "TEXT",
+        "original_highway": "TEXT",
         "length": "FLOAT",
         "cost": "FLOAT"
     }

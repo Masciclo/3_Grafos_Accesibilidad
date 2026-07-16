@@ -28,11 +28,12 @@ class DemandSynthesizer:
         
         h3_indices = set()
         
-        # Identify ID column
+        # Identify ID column case-insensitively
         id_col = None
-        for candidate in ['Zona', 'ZONA_EOD', 'ID', 'OBJECTID']:
-            if candidate in zones_gdf.columns:
-                id_col = candidate
+        candidates = ['zona', 'zona_eod', 'zonas_eod', 'id', 'objectid']
+        for col in zones_gdf.columns:
+            if col.lower() in candidates:
+                id_col = col
                 break
         if not id_col:
             raise KeyError(f"Could not identify Zone ID in {zones_gdf.columns}")
@@ -78,7 +79,7 @@ class DemandSynthesizer:
         if len(h3_gdf) == 0:
             print("   - ERROR: No hexagons were mapped to zones. Check spatial overlap.")
             
-        h3_gdf['eod_zona'] = h3_gdf['eod_zona'].astype(int)
+        h3_gdf['eod_zona'] = pd.to_numeric(h3_gdf['eod_zona'], errors='coerce').fillna(0).astype(int)
         
         return h3_gdf
 
@@ -136,6 +137,12 @@ class DemandSynthesizer:
         od_macro['Zona_Origen'] = pd.to_numeric(od_macro['Zona_Origen'], errors='coerce').fillna(0).astype(int)
         od_macro['Zona_Destino'] = pd.to_numeric(od_macro['Zona_Destino'], errors='coerce').fillna(0).astype(int)
         
+        # Backward compatibility for matrices without purpose columns
+        if 'trips_returning_home' not in od_macro.columns:
+            od_macro['trips_returning_home'] = od_macro['Viajes_Totales'] * 0.5
+        if 'trips_outgoing_destinations' not in od_macro.columns:
+            od_macro['trips_outgoing_destinations'] = od_macro['Viajes_Totales'] * 0.5
+
         # Calculate relative weights within zones
         zone_totals = h3_enriched.groupby('eod_zona')['pop_h3'].sum().reset_index()
         zone_totals.columns = ['eod_zona', 'total_pop_zona']
@@ -167,7 +174,10 @@ class DemandSynthesizer:
             
             # Step 3: Math and Filter
             m_chunk['trips'] = m_chunk['Viajes_Totales'] * m_chunk['w_o'] * m_chunk['w_d']
-            m_chunk = m_chunk[m_chunk['trips'] > 0.1][['h3_origin', 'h3_dest', 'trips']]
+            m_chunk['trips_returning_home'] = m_chunk['trips_returning_home'] * m_chunk['w_o'] * m_chunk['w_d']
+            m_chunk['trips_outgoing_destinations'] = m_chunk['trips_outgoing_destinations'] * m_chunk['w_o'] * m_chunk['w_d']
+            
+            m_chunk = m_chunk[m_chunk['trips'] > 0.1][['h3_origin', 'h3_dest', 'trips', 'trips_returning_home', 'trips_outgoing_destinations']]
             
             total_micro_pairs += len(m_chunk)
             
@@ -194,11 +204,12 @@ class DemandSynthesizer:
         if zones.empty:
             raise ValueError(f"CRITICAL: Zones file {zones_path} is empty.")
         
-        # Check for ID column (using our flexible logic)
+        # Check for ID column case-insensitively
         id_col = None
-        for candidate in ['Zona', 'ZONA_EOD', 'ID', 'OBJECTID']:
-            if candidate in zones.columns:
-                id_col = candidate
+        candidates = ['zona', 'zona_eod', 'zonas_eod', 'id', 'objectid']
+        for col in zones.columns:
+            if col.lower() in candidates:
+                id_col = col
                 break
         if not id_col:
             raise KeyError(f"AUDIT_FAIL: No Zone ID found in {zones.columns}")
@@ -225,27 +236,59 @@ class DemandSynthesizer:
 
     def extract_macro_od_from_mdb(self, mdb_path, output_csv):
         '''
-        Generic extractor for SECTRA MDB databases.
+        Generic extractor for SECTRA MDB/ACCDB databases.
         Joins Viaje and Persona tables to get expanded trips.
+        Optimized to prevent OOM on metropolitan datasets.
         '''
         import subprocess
         import csv
         print(f"   - [Synthesizer] Extracting macro OD from {os.path.basename(mdb_path)}...")
         
-        # 1. Get factors from Persona
-        factors = {}
+        # 1. Check if Viaje has factor column directly to avoid loading Persona table (OOM prevention)
+        v_fieldnames = []
         try:
-            cmd_p = f'mdb-export "{mdb_path}" Persona'
-            proc_p = subprocess.Popen(['bash', '-c', cmd_p], stdout=subprocess.PIPE, text=True)
-            reader_p = csv.DictReader(proc_p.stdout)
-            p_cols = {c.lower(): c for c in reader_p.fieldnames}
-            # Standard SECTRA keys
-            f_col, id_f, id_p = p_cols.get('factor'), p_cols.get('idfolio'), p_cols.get('idpersona')
+            cmd_v = f'mdb-export "{mdb_path}" Viaje'
+            proc_v_header = subprocess.Popen(['bash', '-c', cmd_v], stdout=subprocess.PIPE, text=True)
+            header_line = proc_v_header.stdout.readline()
+            if header_line:
+                v_fieldnames = [name.strip() for name in header_line.split(',')]
+            proc_v_header.terminate()
+            proc_v_header.wait()
+        except Exception:
+            pass
             
-            for row in reader_p:
-                factors[(row[id_f], row[id_p])] = float(row[f_col])
-        except Exception as e:
-            print(f"   - [Warning] Factor extraction failed: {e}. Using 1.0 fallback.")
+        v_cols = {c.lower(): c for c in v_fieldnames} if v_fieldnames else {}
+        
+        factor_candidates = ['factor', 'factor_expansion', 'factor_laboralnormal', 'factorlaboralnormal', 'factorexpansion', 'factor_exp']
+        v_factor_col = None
+        for cand in factor_candidates:
+            if v_cols.get(cand):
+                v_factor_col = v_cols.get(cand)
+                break
+                
+        factors = {}
+        if not v_factor_col:
+            print("   - [Synthesizer] Direct factor column not found in Viaje table. Loading Persona table factors (fallback)...")
+            try:
+                cmd_p = f'mdb-export "{mdb_path}" Persona'
+                proc_p = subprocess.Popen(['bash', '-c', cmd_p], stdout=subprocess.PIPE, text=True)
+                reader_p = csv.DictReader(proc_p.stdout)
+                p_cols = {c.lower(): c for c in reader_p.fieldnames}
+                
+                f_col = p_cols.get('factor') or p_cols.get('factor_expansion') or p_cols.get('factor_laboralnormal')
+                id_f = p_cols.get('idfolio') or p_cols.get('hogar') or p_cols.get('folio')
+                id_p = p_cols.get('idpersona') or p_cols.get('persona')
+                
+                if not id_f or not id_p:
+                    raise KeyError(f"Could not find Hogar/IdFolio or Persona/IdPersona columns in Persona table. Columns: {list(p_cols.values())}")
+                
+                for row in reader_p:
+                    val = row[f_col] if f_col else 1.0
+                    factors[(row[id_f], row[id_p])] = float(val) if val else 1.0
+            except Exception as e:
+                print(f"   - [Warning] Factor extraction failed: {e}. Using 1.0 fallback.")
+        else:
+            print(f"   - [Synthesizer] Found direct factor column '{v_factor_col}' in Viaje table. Bypassing Persona join to prevent OOM.")
 
         # 2. Extract and Expand Trips
         matrix = {}
@@ -254,20 +297,44 @@ class DemandSynthesizer:
             proc_v = subprocess.Popen(['bash', '-c', cmd_v], stdout=subprocess.PIPE, text=True)
             reader_v = csv.DictReader(proc_v.stdout)
             v_cols = {c.lower(): c for c in reader_v.fieldnames}
-            o_col, d_col = v_cols.get('zonaorigen'), v_cols.get('zonadestino')
-            vid_f, vid_p = v_cols.get('idfolio'), v_cols.get('idpersona')
+            o_col = v_cols.get('zonaorigen') or v_cols.get('zona_origen') or v_cols.get('origen')
+            d_col = v_cols.get('zonadestino') or v_cols.get('zona_destino') or v_cols.get('destino')
+            vid_f = v_cols.get('idfolio') or v_cols.get('hogar') or v_cols.get('folio')
+            vid_p = v_cols.get('idpersona') or v_cols.get('persona')
+            prop_col = v_cols.get('proposito') or v_cols.get('proposito_viaje')
+            
+            if not o_col or not d_col:
+                raise KeyError(f"Missing ZonaOrigen/ZonaDestino columns in Viaje table. Columns: {list(v_cols.values())}")
+            if not v_factor_col and (not vid_f or not vid_p):
+                raise KeyError(f"Missing Hogar/IdFolio or Persona/IdPersona columns in Viaje table (needed for Persona join). Columns: {list(v_cols.values())}")
             
             for row in reader_v:
                 o, d = row[o_col], row[d_col]
-                f = factors.get((row[vid_f], row[vid_p]), 1.0)
-                matrix[(o, d)] = matrix.get((o, d), 0) + f
+                
+                if v_factor_col:
+                    val = row[v_factor_col]
+                    f = float(val) if val else 1.0
+                else:
+                    f = factors.get((row[vid_f], row[vid_p]), 1.0)
+                    
+                prop = row.get(prop_col, '') if prop_col else ''
+                is_home = (prop == '6')
+                
+                if (o, d) not in matrix:
+                    matrix[(o, d)] = {'total': 0.0, 'home': 0.0, 'dest': 0.0}
+                
+                matrix[(o, d)]['total'] += f
+                if is_home:
+                    matrix[(o, d)]['home'] += f
+                else:
+                    matrix[(o, d)]['dest'] += f
             
             # Save to temp macro CSV
             with open(output_csv, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['Zona_Origen', 'Zona_Destino', 'Viajes_Totales'])
-                for (o, d), t in matrix.items():
-                    writer.writerow([o, d, t])
+                writer.writerow(['Zona_Origen', 'Zona_Destino', 'Viajes_Totales', 'trips_returning_home', 'trips_outgoing_destinations'])
+                for (o, d), data in matrix.items():
+                    writer.writerow([o, d, data['total'], data['home'], data['dest']])
             return output_csv
         except Exception as e:
             raise RuntimeError(f"Failed to extract OD matrix: {e}")

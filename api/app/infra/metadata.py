@@ -15,7 +15,9 @@ CHILEAN_SCHEMAS = {
         "purpose": ["Proposito", "PROPOSITO_VIAJE"],
         "mode": ["Modo", "MODO_TRANSPORTE"],
         "h3_origin": ["h3_origin", "ORIGEN_H3", "Zona_Origen"],
-        "h3_dest": ["h3_dest", "h3_destination", "DESTINO_H3", "Zona_Destino"]
+        "h3_dest": ["h3_dest", "h3_destination", "DESTINO_H3", "Zona_Destino"],
+        "trips_returning_home": ["trips_returning_home"],
+        "trips_outgoing_destinations": ["trips_outgoing_destinations"]
     }
 }
 

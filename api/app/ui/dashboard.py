@@ -9,6 +9,7 @@ from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeEl
 from rich.table import Table
 from rich.text import Text
 from ui.components import BannerAnimator, diagnostic_handler
+from core.telemetry import telemetry_manager
 
 console = Console(force_terminal=True, color_system="truecolor")
 
@@ -17,7 +18,7 @@ class PipelineUI:
         self.location = location
         self.srid = srid
         self.args = args
-        self.banner_path = os.path.join(os.path.dirname(__file__), "assets", "banner.json")
+        self.banner_path = os.path.join(os.path.dirname(__file__), "assets", "masciclo2.1.json")
         self.animator = BannerAnimator(self.banner_path)
         self.completed = False
         
@@ -100,17 +101,17 @@ class PipelineUI:
         return table
 
     def get_landing_layout(self, prompt_text=None):
+        from rich.align import Align
         layout = Layout()
         layout.split_column(
             Layout(name="banner", ratio=1),
             Layout(name="prompt", size=3)
         )
+        # Use ANSI-backed frame for color stability
+        frame = self.animator.get_ansi_frame()
+        
         layout["banner"].update(
-            Panel(
-                Text(self.animator.get_next_frame(), justify="center", style="green"), 
-                border_style="green", 
-                padding=(2, 2)
-            )
+            Align.center(frame, vertical="middle")
         )
         
         display_text = prompt_text if prompt_text else "[bold green]esperando consulta...[/]"
@@ -230,7 +231,7 @@ class PipelineUI:
         layout["footer"].update(footer_msg)
         return layout
 
-from core.scenario import ProgressSeam
+from core.pipeline import ProgressSeam
 
 class RichProgressAdapter(ProgressSeam):
     """
@@ -243,6 +244,19 @@ class RichProgressAdapter(ProgressSeam):
         self.refactor_task_id = None
 
     def on_stage_start(self, stage_id: int, name: str, eta: str = "Auto"):
+        # Resolve ETA if still 'Auto' using telemetry manager
+        if eta == "Auto":
+            stage_map = {1: 'ingestion', 2: 'topo', 3: 'grid', 5: 'refactor', 7: 'routing', 8: 'agg', 9: 'final'}
+            key = stage_map.get(stage_id)
+            if key and self.ui.args:
+                raw_pred = telemetry_manager.predict_eta(
+                    getattr(self.ui.args, 'osm_input', 'osm'), 
+                    getattr(self.ui.args, 'od_input', 'od'), 
+                    bool(getattr(self.ui.args, 'projects_input', None)), 
+                    stage=key
+                )
+                eta = telemetry_manager.format_eta(raw_pred)
+
         # Safe lookup for pruned phases
         target = next((p for p in self.ui.phases if p["id"] == stage_id), None)
         if target:
@@ -264,7 +278,8 @@ class RichProgressAdapter(ProgressSeam):
         signal_to_id = {
             "ADVANCE_ROUTING": 7,
             "ADVANCE_REFACTOR": 5,
-            "ADVANCE_AGGREGATION": 8
+            "ADVANCE_AGGREGATION": 8,
+            "ADVANCE_MAPPING": 9
         }
         
         phase_id = signal_to_id.get(status)
@@ -273,5 +288,20 @@ class RichProgressAdapter(ProgressSeam):
         elif status == "ADVANCE_GRID": # Task 13.9: H3 Grid specific
             self.ui.update_phase(3, "RUNNING", increment=increment, total=total)
 
-    def report_diagnostic(self, level: str, message: str):
-        diagnostic_handler.report("ENGINE", level, message)
+    def report_diagnostic(self, tag: str, level: str, message: str):
+        diagnostic_handler.report(tag, level, message)
+
+    def get_timings(self) -> Dict[str, float]:
+        """
+        Extracts duration for each stage from the UI phase tracking.
+        """
+        timings = {}
+        stage_map = {
+            1: 'ingestion', 2: 'topo', 3: 'grid', 
+            5: 'refactor', 7: 'routing', 8: 'agg', 9: 'final'
+        }
+        for p in self.ui.phases:
+            key = stage_map.get(p["id"])
+            if key and p["start"] and p["end"]:
+                timings[f"t_{key}"] = p["end"] - p["start"]
+        return timings

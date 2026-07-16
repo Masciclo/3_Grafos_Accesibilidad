@@ -50,53 +50,81 @@ def stream_file_to_postgres(file_path, table_name, srid, user, password, host, p
         "-nlt", "PROMOTE_TO_MULTI"
     ]
     
+    if file_path.lower().endswith('.csv'):
+        cmd.extend(["-oo", "AUTODETECT_TYPE=YES"])
+    
     try:
         subprocess.run(cmd, check=True, capture_output=True)
-        # Post-injection index
+        # Post-injection index (only if geometry column exists)
         conn = create_conn(database_name, host, port, user, password)
-        execute_query(conn, f"CREATE INDEX IF NOT EXISTS {table_name}_geom_idx ON {table_name} USING GIST (geometry);")
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name = '{table_name}' 
+                      AND column_name = 'geometry'
+                );
+            """)
+            has_geometry = cur.fetchone()[0]
+            if has_geometry:
+                cur.execute(f"CREATE INDEX IF NOT EXISTS {table_name}_geom_idx ON {table_name} USING GIST (geometry);")
+                conn.commit()
         print(f"Table {table_name} streamed successfully via ogr2ogr.")
         return True
     except subprocess.CalledProcessError as e:
         print(f"Ogr2ogr failed: {e.stderr.decode()}")
         return False
 
-def df_to_postgres(df, table_name, geom_type, srid, user, password, host, port, database_name, mode='replace'):
+def df_to_postgres(df, table_name, geom_type, srid, user, password, host, port, database_name, mode='replace', conn=None):
     '''
     Description: upload a df object into a database with atomicity and spatial indexing.
     Optimized for Metropolitan scale (Pre-conversion chunking).
     '''
-    if srid is not None:
-        srid = int(srid)
-    
-    engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
+    if srid is not None and str(srid).lower() != 'none' and str(srid).strip() != '':
+        try:
+            srid = int(srid)
+        except (ValueError, TypeError):
+            srid = 4326
+    else:
+        srid = 4326 # Safety fallback
     
     # --- Strategy: ID Enforcement ---
-    # Ensure we have a simple integer ID column for pgRouting
     df = df.copy()
     if 'id' not in df.columns:
         df = df.reset_index()
         if 'index' in df.columns:
             df = df.rename(columns={'index': 'id'})
         else:
-            # Handle multi-index or other index types
             df['id'] = range(1, len(df) + 1)
     
-    # --- Strategy: Pre-conversion Chunking ---
+    # We ALWAYS need a SQLAlchemy engine for geoalchemy2 types in to_sql
+    # If we have a psycopg2 connection, we derive the engine URL from its dsn
+    if conn and not hasattr(conn, 'execute'): # Check if it's NOT an engine
+        # Derive engine from connection parameters or environment
+        # Use existing credentials since they are passed in
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
+    elif conn:
+        engine = conn
+    else:
+        engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{database_name}')
+    
     chunk_size = 5000
     chunks = [df[i:i + chunk_size] for i in range(0, df.shape[0], chunk_size)]
     
-    with engine.begin() as connection:
+    def _execute_chunks(target_conn):
         for i, df_chunk in enumerate(chunks):
             current_mode = 'replace' if (i == 0 and mode == 'replace') else 'append'
             
-            # --- Safety: Drop null geometries ---
+            # --- Safety: Handle Geometries ---
             if 'geometry' in df_chunk.columns:
+                # Filter nulls and convert to WKT strings wrapped in WKTElement
+                # Note: We must avoid pandas attempting its own geometry interpretation
                 df_chunk = df_chunk[df_chunk['geometry'].notnull()].copy()
-
-            # Convert geometry to WKTElement for THIS CHUNK ONLY
-            if 'geometry' in df_chunk.columns:
-                df_chunk['geometry'] = df_chunk['geometry'].apply(lambda geom: WKTElement(geom, srid=srid))
+                
+                # We rename to avoid collision with standard geometry handling in some drivers
+                # and use WKTElement to specify the SRID
+                df_chunk['geometry'] = df_chunk['geometry'].apply(lambda geom: WKTElement(geom.wkt, srid=srid))
                 dtype = {'geometry': Geometry(geom_type, srid=srid)}
             else:
                 dtype = {}
@@ -104,7 +132,7 @@ def df_to_postgres(df, table_name, geom_type, srid, user, password, host, port, 
             # Write chunk to PostgreSQL
             df_chunk.to_sql(
                 table_name, 
-                connection, 
+                target_conn, 
                 if_exists=current_mode, 
                 index=False, 
                 dtype=dtype,
@@ -112,12 +140,16 @@ def df_to_postgres(df, table_name, geom_type, srid, user, password, host, port, 
             )
 
             if 'geometry' in df_chunk.columns and current_mode == 'replace':
-                # Create spatial Index only on the first chunk
                 sql_file_path = os.path.join(sql_base_path, 'create_spatial_index.sql')
                 with open(sql_file_path, 'r') as f:
                     query_template = f.read()
                 query = query_template.format(layer_name=table_name, schema_name='public')
-                connection.execute(text(query))
+                
+                # SQLAlchemy 2.0+ uses text() and executes on connection
+                target_conn.execute(text(query))
+
+    with engine.begin() as connection:
+        _execute_chunks(connection)
     
     print(f'Table {table_name} imported successfully ({len(chunks)} chunks).')
 

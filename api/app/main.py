@@ -20,7 +20,8 @@ from ui.components import diagnostic_handler
 from infra.database import create_conn, execute_query, check_table_existence
 from infra.ingestion import handle_path_argument, create_abbreviation
 from infra.metadata import metadata_audit, validate_hygienic_invariant
-from core.scenario import ScenarioEngine, ScenarioConfig
+from core.scenario import ScenarioEngine
+from core.pipeline import ScenarioConfig
 from core.data_provider import DataProvider
 from core.telemetry import telemetry_manager
 
@@ -67,6 +68,8 @@ def main():
     parser.add_argument("--imp_bike", dest="imp_bike", type=float, default=0.5)
     parser.add_argument("--inhibit", dest="inhibit", type=int, default=1)
     parser.add_argument("--disinhibit", dest="disinhibit", type=int, default=1)
+    parser.add_argument("--recommendation", dest="recommendation", type=str, help="Natural language prompt for AI-assisted cycleway design recommendations")
+    parser.add_argument("--rec_sample_size", dest="rec_sample_size", type=int, default=1000, help="Uniform sample size of active OD pairs to accelerate greedy optimization")
 
     args = parser.parse_args()
     args.machine_hash = telemetry_manager.machine_hash # Inject for UI
@@ -110,21 +113,34 @@ def main():
 
         # Step 1: Logo Animation (Plays for every run)
         temp_ui = PipelineUI("Booting Scenario", "0000", args=args)
-        total_frames = len(temp_ui.animator.frames)
-        with Live(temp_ui.get_landing_layout(), refresh_per_second=20, console=console) as live:
-            for frame_idx in range(total_frames):
-                if select.select([sys.stdin], [], [], 0.0)[0]: break 
-                temp_ui.animator.current_frame = frame_idx
-                live.update(temp_ui.get_landing_layout(prompt_text="[bold dim]analizando factibilidad técnica...[/]"))
-                time.sleep(0.04)
+        # Use raw ANSI play_intro for 100% color fidelity
+        temp_ui.animator.play_intro(loops=1)
 
         locations = [loc.strip() for loc in args.location.split(",")]
         
         for current_loc in locations:
             city_key = current_loc.split(',')[0].strip().lower()
-            city_meta = provider.get_city_meta(city_key) or {}
+            city_meta = provider.get_city_meta(city_key)
+            if not city_meta:
+                if not sys.stdin.isatty():
+                    console.print(f"[bold red]Error:[/] City '{city_key}' is not registered and stdin is not a TTY. Cannot launch Wizard.")
+                    sys.exit(1)
+                city_meta = provider.bootstrap_new_city(city_key)
+                if not city_meta:
+                    console.print(f"[bold red]Skipping unregistered city '{city_key}'...[/]")
+                    continue
+
             target_loc = city_meta.get("osm_name", current_loc)
-            target_srid = city_meta.get("srid", args.srid)
+            # --- SRID Resolution ---
+            raw_srid = city_meta.get("srid", args.srid)
+            if raw_srid is None or str(raw_srid).lower() == 'none' or str(raw_srid).strip() == '':
+                target_srid = 4326
+            else:
+                try:
+                    target_srid = int(raw_srid)
+                except ValueError:
+                    target_srid = 4326
+            
             study_area_bbox = city_meta.get("bbox")
 
             # --- DataProvider: Satisfy Pre-requisites ---
@@ -175,7 +191,7 @@ def main():
                 console.print(ui.get_audit_layout(census_map, od_map, spatial_status))
                 
                 from rich.prompt import Prompt
-                choice = Prompt.ask("[bold cyan]Choice (C: Continue, R: Redefine)[/]", choices=["C", "c", "R", "r"], show_choices=False).upper()
+                choice = Prompt.ask("[bold yellow]¿Qué deseas hacer? (C: Continuar, R: Redefinir)[/]", choices=["C", "c", "R", "r"], show_choices=False).upper()
                 
                 if choice == "R":
                     args.location = None 
@@ -196,9 +212,54 @@ def main():
                     args.location = None
                     break
 
+            # --- AI Recommendation Engine Activation Hook ---
+            if args.recommendation:
+                if not args.reference_scenario:
+                    console.print("[bold red]Error:[/] The --recommendation flag requires a --reference_scenario (e.g. --reference_scenario=current) to run.")
+                    sys.exit(1)
+                
+                api_key = os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    console.print("\n[bold yellow]🔑 GEMINI API KEY IS REQUIRED FOR ACTIVE AGENT[/]")
+                    try:
+                        api_key = input("Enter your GEMINI_API_KEY (leave blank to exit): ").strip()
+                    except (KeyboardInterrupt, EOFError):
+                        api_key = ""
+                    if not api_key:
+                        console.print("[bold red]Error:[/] GEMINI_API_KEY not provided. Recommendation engine aborted.")
+                        sys.exit(1)
+                    
+                    env_file_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), ".env")
+                    try:
+                        with open(env_file_path, "a") as f:
+                            f.write(f"\nGEMINI_API_KEY={api_key}\n")
+                        os.environ["GEMINI_API_KEY"] = api_key
+                        console.print("[bold green]Key saved successfully to configuration.[/]")
+                    except Exception as e:
+                        console.print(f"[bold red]Warning:[/] Could not save key to .env: {e}")
+                
+                console.print(f"\n[bold green]🤖 INITIALIZING AI RECOMMENDATION AGENT FOR: {target_loc}[/]")
+                from core.recommendation import RecommendationEngine
+                rec_engine = RecommendationEngine(db_config, data_base_path, target_loc, target_srid)
+                
+                rec_geojson_path = rec_engine.run_recommendation_pipeline(
+                    prompt=args.recommendation,
+                    reference_scenario=args.reference_scenario,
+                    sample_size=args.rec_sample_size,
+                    study_area_bbox=study_area_bbox
+                )
+                
+                if not rec_geojson_path:
+                    console.print("[bold red]Recommendation failed to produce upgrade geometries. Aborting.[/]")
+                    sys.exit(1)
+                
+                args.projects_input = rec_geojson_path
+                args.scenario_id = "rec_" + os.path.basename(rec_geojson_path).replace(".geojson", "").split("_")[-1]
+                console.print(f"[bold green]Auto-triggering project evaluation scenario: {args.scenario_id}[/]\n")
+
             # --- SCREEN 3: ScenarioEngine Execution ---
             config = ScenarioConfig(
-                location=target_loc, city_key=city_key, scenario_id=args.scenario_id, srid=int(target_srid),
+                location=target_loc, city_key=city_key, scenario_id=args.scenario_id, srid=target_srid,
                 osm_input=args.osm_input, od_input=validated_od, census_input=args.census_input,
                 ciclo_input=args.ciclo_input, projects_input=args.projects_input,
                 reference_scenario=args.reference_scenario, bbox=study_area_bbox,
@@ -236,7 +297,7 @@ def main():
         # Post-execution logic
         if interactive_mode:
             # Task 13.8: Wait for user acknowledgment before returning to Screen 1
-            Prompt.ask("\n[bold yellow]Analysis Complete. Press [ENTER] to return to consultation...[/]")
+            Prompt.ask("\n[bold yellow]Análisis Completado. Presiona [ENTER] para regresar a la consola de consulta...[/]")
             args.location = None
         else:
             break

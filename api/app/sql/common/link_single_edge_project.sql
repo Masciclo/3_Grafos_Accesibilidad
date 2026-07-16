@@ -15,6 +15,8 @@ WHERE (project_id = '{pid}' AND is_project = TRUE)
          AND ST_DWithin(base.geometry, proj.geometry, {zp_distance})
          AND base.is_project = FALSE
    ));
+CREATE INDEX project_zone_context_gix ON project_zone_context USING GIST (geometry);
+ANALYZE project_zone_context;
 
 -- 2. PLANARIZE TO CHECK FOR ANY INTERSECTION
 -- We use ST_Node(ST_Union) on the context to ensure all crossings are nodalized.
@@ -41,7 +43,7 @@ BEGIN
                 ctx.impedance,
                 ROW_NUMBER() OVER(PARTITION BY n.g ORDER BY ctx.is_project DESC) as rank
             FROM nodalized n
-            JOIN project_zone_context ctx ON ST_Within(ST_Centroid(n.g), ST_Buffer(ctx.geometry, 0.01))
+            JOIN project_zone_context ctx ON ST_DWithin(ST_LineInterpolatePoint(n.g, 0.5), ctx.geometry, 0.02)
         )
         SELECT g, highway, is_project, project_id, parent_baseline_id, impedance
         FROM ranked_fragments
@@ -93,6 +95,17 @@ BEGIN
 
         DELETE FROM {network_table} WHERE id = r.base_edge_id;
     END LOOP;
+END $$;
+
+-- 3.3 Save snap diagnostics
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='{diag_snaps_table}') THEN
+        INSERT INTO {diag_snaps_table} (project_id, geometry)
+        SELECT '{pid}', ST_MakeLine(orig_geom, snap_geom)
+        FROM nodal_points
+        WHERE ST_Distance(orig_geom, snap_geom) > 0.001;
+    END IF;
 END $$;
 
 -- 4. FORCED CONTINUITY BRIDGE

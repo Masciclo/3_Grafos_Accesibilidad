@@ -6,6 +6,7 @@ SELECT DISTINCT ON (geom_dump)
     (ST_Dump(ST_MakeValid(ST_Intersection(a.geometry, b.geometry)))).geom AS geom_dump,
     CASE 
         WHEN a.is_project = TRUE THEN a.impedance -- PRESERVE PROJECT INCENTIVE
+        WHEN a.highway = 'cycleway' THEN a.impedance -- PROTECT BASELINE BIKELANE IMPEDANCE
         ELSE b.impedance 
     END as impedance,
     a.highway,
@@ -26,6 +27,7 @@ SELECT
     (ST_Dump(ST_MakeValid(ST_Difference(a.geometry, diff.total_buffer)))).geom AS geom_dump,
     CASE 
         WHEN a.is_project = TRUE THEN a.impedance -- PRESERVE PROJECT INCENTIVE
+        WHEN a.highway = 'cycleway' THEN a.impedance -- PROTECT BASELINE BIKELANE IMPEDANCE
         ELSE 1.0 
     END as impedance,
     a.highway,
@@ -47,6 +49,7 @@ SELECT
     geometry as geom_dump,
     CASE 
         WHEN is_project = TRUE THEN impedance -- PRESERVE PROJECT INCENTIVE
+        WHEN highway = 'cycleway' THEN impedance -- PROTECT BASELINE BIKELANE IMPEDANCE
         ELSE 1.0 
     END as impedance,
     highway,

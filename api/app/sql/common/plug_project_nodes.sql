@@ -49,6 +49,23 @@ CROSS JOIN LATERAL (
 UPDATE {network_table} SET source = m.target_node_id FROM plugging_map m WHERE source = m.isolated_node_id AND project_id = '{pid}';
 UPDATE {network_table} SET target = m.target_node_id FROM plugging_map m WHERE target = m.isolated_node_id AND project_id = '{pid}';
 
+-- 4.1 Save plugging diagnostics
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='{diag_nodes_table}') THEN
+        INSERT INTO {diag_nodes_table} (project_id, geometry)
+        SELECT '{pid}', the_geom FROM isolated_project_nodes;
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='{diag_links_table}') THEN
+        INSERT INTO {diag_links_table} (project_id, geometry)
+        SELECT '{pid}', ST_MakeLine(v1.the_geom, v2.the_geom)
+        FROM plugging_map m
+        JOIN {network_table}_vertices_pgr v1 ON m.isolated_node_id = v1.id
+        JOIN {network_table}_vertices_pgr v2 ON m.target_node_id = v2.id;
+    END IF;
+END $$;
+
 -- 5. Audit
 DO $$
 BEGIN
