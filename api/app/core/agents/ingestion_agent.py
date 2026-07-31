@@ -334,7 +334,60 @@ class PreflightDiagnosticAuditor:
                     ))
                     overall_verdict = IngestibilityStatus.NON_INGESTABLE_UNRELATED
 
-        # --- 2. Audit Census Dataset ---
+        # --- 2. Audit OD Matrix Files ---
+        if os.path.exists(demand_dir):
+            od_files = [f for f in os.listdir(demand_dir) if f.endswith(".csv") or f.endswith(".parquet")]
+            if od_files:
+                od_target = od_files[0]
+                od_full_path = os.path.join(demand_dir, od_target)
+                try:
+                    import pandas as pd
+                    if od_target.endswith(".csv"):
+                        od_df = pd.read_csv(od_full_path, nrows=10)
+                    else:
+                        od_df = pd.read_parquet(od_full_path)
+                    cols = od_df.columns.tolist()
+                    actions = []
+                    issues = []
+                    status = IngestibilityStatus.INGESTABLE_READY
+                    
+                    alias_found = False
+                    for col in cols:
+                        if col.lower() in ['origen', 'id_origen'] and col != 'origin':
+                            column_mapping[col] = 'origin'
+                            alias_found = True
+                        elif col.lower() in ['destino', 'id_destino'] and col != 'destination':
+                            column_mapping[col] = 'destination'
+                            alias_found = True
+                        elif col.lower() in ['viajes', 'cant_viajes'] and col != 'trips':
+                            column_mapping[col] = 'trips'
+                            alias_found = True
+
+                    if alias_found:
+                        actions.append(SanitationActionType.REMAP_COLUMNS)
+                        issues.append(f"Non-standard OD matrix column headers detected ({list(column_mapping.keys())})")
+                        status = IngestibilityStatus.INGESTABLE_REPAIRABLE
+
+                    reports.append(FileDiagnosticReport(
+                        filename=od_target,
+                        filepath=od_full_path,
+                        status=status,
+                        schema_alignment=SchemaAlignmentType.ALIAS_MAPPABLE if alias_found else SchemaAlignmentType.CANONICAL_KEYS_PRESENT,
+                        detected_columns=cols,
+                        proposed_actions=actions,
+                        issues_summary=issues
+                    ))
+                    if status == IngestibilityStatus.INGESTABLE_REPAIRABLE:
+                        overall_verdict = IngestibilityStatus.INGESTABLE_REPAIRABLE
+                except Exception as e:
+                    reports.append(FileDiagnosticReport(
+                        filename=od_target,
+                        filepath=od_full_path,
+                        status=IngestibilityStatus.NON_INGESTABLE_UNRELATED,
+                        issues_summary=[f"Could not read OD matrix file: {e}"]
+                    ))
+
+        # --- 3. Audit Census Dataset ---
         if os.path.exists(census_path):
             try:
                 import pandas as pd
@@ -392,7 +445,7 @@ class PreflightDiagnosticAuditor:
             ))
             overall_verdict = IngestibilityStatus.INGESTABLE_REPAIRABLE
 
-        # --- 3. Render Rich Diagnostic Panel ---
+        # --- 4. Render Rich Diagnostic Panel ---
         table = Table(title="Dataset Ingestibility Diagnostic Breakdown", border_style="cyan", show_header=True, header_style="bold magenta")
         table.add_column("Filename", style="bold white", width=25)
         table.add_column("Status", width=22)
@@ -445,6 +498,7 @@ class SanitationRecipeExecutor:
         city_key = recipe.city_key
         raw_dir = os.path.join(data_base_path, "data", city_key, "raw")
         proc_dir = os.path.join(data_base_path, "data", city_key, "proc")
+        zones_dir = os.path.join(raw_dir, f"{city_key}_zones")
         unused_dir = os.path.join(raw_dir, "unused")
         os.makedirs(proc_dir, exist_ok=True)
 
@@ -454,16 +508,44 @@ class SanitationRecipeExecutor:
         if recipe.archive_files:
             os.makedirs(unused_dir, exist_ok=True)
             for filename in recipe.archive_files:
-                src = os.path.join(raw_dir, f"{city_key}_zones", filename)
+                src = os.path.join(zones_dir, filename)
                 if os.path.exists(src):
                     base = os.path.splitext(filename)[0]
                     for ext in ['.shp', '.dbf', '.shx', '.prj', '.qpj', '.cpg']:
-                        f_ext = os.path.join(raw_dir, f"{city_key}_zones", base + ext)
+                        f_ext = os.path.join(zones_dir, base + ext)
                         if os.path.exists(f_ext):
                             shutil.move(f_ext, os.path.join(unused_dir, base + ext))
                     print(f"   ✓ Archived auxiliary file: {filename} -> unused/")
 
-        # 2. Census BBOX Spatial Clipping
+        # 2. Shapefile Reprojection & Column Remapping
+        if recipe.reproject_files or recipe.column_mapping:
+            if os.path.exists(zones_dir):
+                shp_files = [f for f in os.listdir(zones_dir) if f.endswith('.shp')]
+                for shp_name in shp_files:
+                    shp_path = os.path.join(zones_dir, shp_name)
+                    try:
+                        gdf = gpd.read_file(shp_path)
+                        modified = False
+                        
+                        if recipe.column_mapping:
+                            rename_map = {k: v for k, v in recipe.column_mapping.items() if k in gdf.columns}
+                            if rename_map:
+                                gdf = gdf.rename(columns=rename_map)
+                                print(f"   ✓ Renamed shapefile columns in {shp_name}: {rename_map}")
+                                modified = True
+                                
+                        if shp_name in recipe.reproject_files and recipe.target_srid:
+                            print(f"   - [Reproject] Transforming {shp_name} to EPSG:{recipe.target_srid}...")
+                            gdf = gdf.to_crs(epsg=recipe.target_srid)
+                            modified = True
+                            
+                        if modified:
+                            gdf.to_file(shp_path)
+                            print(f"   ✓ Saved updated shapefile {shp_name}.")
+                    except Exception as shp_err:
+                        print(f"   ✕ Failed updating shapefile {shp_name}: {shp_err}")
+
+        # 3. Census BBOX Spatial Clipping
         if recipe.census_bbox_clip and os.path.exists(recipe.census_bbox_clip) and bbox is not None:
             try:
                 print(f"   - [Census BBOX Clip] Clipping nationwide census dataset to city buffer $+ 15km$...")
@@ -478,6 +560,18 @@ class SanitationRecipeExecutor:
                 buffer_deg = 0.15
                 xmin, ymin, xmax, ymax = xmin - buffer_deg, ymin - buffer_deg, xmax + buffer_deg, ymax + buffer_deg
                 
+                if 'lat' in c_df.columns and 'lon' in c_df.columns:
+                    mask = (c_df['lon'] >= xmin) & (c_df['lon'] <= xmax) & (c_df['lat'] >= ymin) & (c_df['lat'] <= ymax)
+                    c_df = c_df[mask]
+
+                proc_census_path = os.path.join(proc_dir, "census.parquet")
+                c_df.to_parquet(proc_census_path)
+                print(f"   ✓ Clipped census dataset saved to {proc_census_path} ({len(c_df)} rows).")
+            except Exception as e:
+                print(f"   ✕ Census BBOX clipping failed: {e}")
+
+        print("✓ [SanitationExecutor] Recipe execution completed successfully.")
+        return True
                 if 'lat' in c_df.columns and 'lon' in c_df.columns:
                     mask = (c_df['lon'] >= xmin) & (c_df['lon'] <= xmax) & (c_df['lat'] >= ymin) & (c_df['lat'] <= ymax)
                     c_df = c_df[mask]
