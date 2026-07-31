@@ -712,6 +712,7 @@ class AcademicMapGenerator:
             xb, yb, hover = [], [], []
             for _, row in bucket.iterrows():
                 f_val = float(row['od_flow'] or 0)
+                pcr = (f_val / total_trips) * 100.0 if total_trips > 0 else 0.0
                 p_id = row.get('project_id')
                 if p_id is not None and str(p_id) != 'None' and str(p_id).strip() != '':
                     h_text = f"<b>Project: {p_id}</b>"
