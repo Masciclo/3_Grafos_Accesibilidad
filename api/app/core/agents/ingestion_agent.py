@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from core.metadata_agent import generate_content_with_retry
 
-class SanitationRecipe(BaseModel):
+class LLMSanitationRecipeSchema(BaseModel):
     archive_files: List[str] = Field(default=[], description="List of auxiliary filenames to move to the unused/ folder to prevent ambiguity (e.g. Manzanas, Macrozonas).")
     merge_output_name: Optional[str] = Field(None, description="If communes need merging, target output filename (e.g. Zonas_EOD_GV.shp).")
     merge_sources: List[str] = Field(default=[], description="If communes need merging, list of source shapefile names (e.g. ['Zonas_Valparaiso.shp', 'Zonas_Vina_del_Mar.shp']).")
@@ -88,11 +88,11 @@ class IngestionAgent:
                 config=types.GenerateContentConfig(
                     system_instruction=system_instructions,
                     response_mime_type="application/json",
-                    response_schema=SanitationRecipe,
+                    response_schema=LLMSanitationRecipeSchema,
                     temperature=0.0
                 )
             )
-            recipe = SanitationRecipe.model_validate_json(response.text)
+            recipe = LLMSanitationRecipeSchema.model_validate_json(response.text)
             return recipe
         except Exception as e:
             print(f"[IngestionAgent Error] Failed to generate sanitation recipe: {e}")
