@@ -738,7 +738,7 @@ class RecommendationEngine:
             cur.execute(f"""
                 SELECT id, highway, ST_AsText(ST_Transform(geometry, 4326)) as geom_wkt
                 FROM {net_table}
-                WHERE id IN ({edge_ids_str});
+                WHERE id IN ({edge_ids_str}) AND highway != 'cycleway';
             """)
             rows = cur.fetchall()
             for r in rows:
