@@ -293,10 +293,6 @@ class RoutingVisualizer:
             if config.reference_scenario and plots[0] is not None:
                 reporter.compile_report(plots, scenario_prefix, "Academic Impact Report", project_metrics=project_metrics)
 
-            # Generate standalone Project Performance Map if projects are present
-            if config.projects_input:
-                reporter.generate_map(net_gdf, MapType.PROJECT_PERFORMANCE, master_bbox, scenario_prefix, total_trips)
-
             # Generate Standalone H3 Purpose Maps dynamically
             h3_table = f"{scenario_prefix}_h3"
             with self.context.conn.cursor() as cur:
