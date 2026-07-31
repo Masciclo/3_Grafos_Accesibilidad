@@ -188,20 +188,39 @@ class NetworkOntologyProfiler:
                 summary["cycleway_edges"] = row[1]
                 summary["total_cycleway_length_m"] = float(row[2])
 
-            # 2. Top Cycleway Components by Flow and Length
-            cur.execute(f"""
-                SELECT 
-                    COALESCE(highway, 'cycleway') as hway,
-                    COUNT(*) as edges,
-                    SUM(COALESCE(od_flow, 0)) as total_flow,
-                    SUM(ST_Length(geometry)) as total_len
-                FROM {self.net_table}
-                WHERE highway = 'cycleway'
-                GROUP BY hway
-                ORDER BY total_flow DESC
-                LIMIT 5;
-            """)
-            top_components = cur.fetchall()
+            # 2. Top BFS Cycleway Components by Flow and Length
+            try:
+                cur.execute(f"""
+                    SELECT 
+                        COALESCE(CAST(component_id AS TEXT), 'c_main') as comp_id,
+                        COUNT(*) as edges,
+                        SUM(COALESCE(od_flow, 0)) as total_flow,
+                        SUM(ST_Length(geometry)) as total_len
+                    FROM {self.net_table}
+                    WHERE highway = 'cycleway'
+                    GROUP BY comp_id
+                    ORDER BY total_flow DESC
+                    LIMIT 5;
+                """)
+                top_components = cur.fetchall()
+            except Exception:
+                conn.rollback()
+                top_components = []
+
+            # 3. Top H3 Demand Hotspots
+            h3_table = f"{self.net_prefix}_h3"
+            try:
+                cur.execute(f"""
+                    SELECT h3_index, SUM(trips) as total_trips
+                    FROM {h3_table}
+                    GROUP BY h3_index
+                    ORDER BY total_trips DESC
+                    LIMIT 10;
+                """)
+                demand_hotspots = cur.fetchall()
+            except Exception:
+                conn.rollback()
+                demand_hotspots = []
 
         except Exception as e:
             diagnostic_handler.report("PROFILER_ERROR", "WARNING", f"Could not profile network ontology: {e}")

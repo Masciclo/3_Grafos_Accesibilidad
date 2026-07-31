@@ -66,7 +66,14 @@ class UrbanOntologyInterpretation(BaseModel):
         """Applies smart fallback defaults to under-specified natural language prompts."""
         total = parsed_dict.get("total_projects", 10)
         budget = parsed_dict.get("default_budget_per_project_m", 1000.0)
-        anchor = parsed_dict.get("global_seed_strategy", SpatialAnchorType.COMPONENT_TIP)
+        raw_anchor = parsed_dict.get("global_seed_strategy", SpatialAnchorType.COMPONENT_TIP)
+        if isinstance(raw_anchor, str):
+            try:
+                anchor = SpatialAnchorType(raw_anchor)
+            except ValueError:
+                anchor = SpatialAnchorType.COMPONENT_TIP
+        else:
+            anchor = raw_anchor
 
         projects = []
         raw_projects = parsed_dict.get("projects", [])
