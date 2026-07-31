@@ -103,6 +103,7 @@ class UrbanOntologyInterpretation(BaseModel):
                 )
             projects.append(p_spec)
 
+
         return cls(
             city_key=city_key,
             raw_prompt=raw_prompt,
@@ -115,3 +116,67 @@ class UrbanOntologyInterpretation(BaseModel):
             global_seed_strategy=anchor,
             projects=projects
         )
+
+
+# =====================================================================
+# +Ciclo Ingestion Diagnostics & Automated Data Sanitation (IngestionOntology v1)
+# =====================================================================
+
+class IngestibilityStatus(str, Enum):
+    """Ingestibility Verdict for Raw City Datasets"""
+    INGESTABLE_READY = "INGESTABLE_READY"  # Schema & CRS 100% compliant. Zero repair needed.
+    INGESTABLE_REPAIRABLE = "INGESTABLE_REPAIRABLE"  # Repairable via Sanitation Recipe (columns, CRS, BBOX).
+    NON_INGESTABLE_UNRELATED = "NON_INGESTABLE_UNRELATED"  # Corrupted, empty, or non-spatial document.
+
+
+class SpatialSanityType(str, Enum):
+    """Spatial Layer Geometry & Projection Status"""
+    CRS_MATCH = "CRS_MATCH"  # Native CRS matches target city SRID.
+    CRS_REPROJECT_NEEDED = "CRS_REPROJECT_NEEDED"  # Valid spatial layer requiring CRS reprojection.
+    GEOM_CORRUPTED = "GEOM_CORRUPTED"  # Invalid topology / null geometry.
+    NOT_SPATIAL = "NOT_SPATIAL"  # Non-spatial table (OD matrix, survey CSV).
+
+
+class SchemaAlignmentType(str, Enum):
+    """Schema & Column Name Alignment Status"""
+    CANONICAL_KEYS_PRESENT = "CANONICAL_KEYS_PRESENT"  # Standard zone_id, origin, destination present.
+    ALIAS_MAPPABLE = "ALIAS_MAPPABLE"  # Aliases detected (e.g. ID_ZONA -> zone_id, n_per -> pop_total).
+    MISSING_CRITICAL_KEYS = "MISSING_CRITICAL_KEYS"  # Required spatial or matrix index missing.
+
+
+class SanitationActionType(str, Enum):
+    """Sanitation Recipe Action Types"""
+    REPROJECT_CRS = "REPROJECT_CRS"  # Reproject GeoDataFrame to target SRID
+    REMAP_COLUMNS = "REMAP_COLUMNS"  # Rename column aliases to canonical keys
+    MERGE_COMMUNES = "MERGE_COMMUNES"  # Merge multi-commune shapefile parts into unified layer
+    ARCHIVE_AUXILIARY = "ARCHIVE_AUXILIARY"  # Move non-primary shapefiles to unused/ folder
+    CENSUS_BBOX_CLIP = "CENSUS_BBOX_CLIP"  # Clip nationwide/regional census to city BBOX + 15km
+    FALLBACK_OSM_RESIDENTIAL = "FALLBACK_OSM_RESIDENTIAL"  # Fall back to OSM residential building footprints
+
+
+class FileDiagnosticReport(BaseModel):
+    """Diagnostic Audit Report for an Individual File"""
+    filename: str = Field(description="Raw filename")
+    filepath: str = Field(description="Absolute or relative file path")
+    status: IngestibilityStatus = Field(default=IngestibilityStatus.INGESTABLE_READY)
+    spatial_sanity: SpatialSanityType = Field(default=SpatialSanityType.NOT_SPATIAL)
+    schema_alignment: SchemaAlignmentType = Field(default=SchemaAlignmentType.CANONICAL_KEYS_PRESENT)
+    detected_crs: Optional[str] = Field(default=None)
+    detected_columns: List[str] = Field(default_factory=list)
+    proposed_actions: List[SanitationActionType] = Field(default_factory=list)
+    issues_summary: List[str] = Field(default_factory=list)
+
+
+class SanitationRecipe(BaseModel):
+    """Executable Sanitation Recipe for a City's Raw Directory"""
+    city_key: str = Field(description="Target city key e.g. santiago, valdivia")
+    target_srid: int = Field(default=4326)
+    verdict: IngestibilityStatus = Field(default=IngestibilityStatus.INGESTABLE_READY)
+    file_reports: List[FileDiagnosticReport] = Field(default_factory=list)
+    archive_files: List[str] = Field(default_factory=list, description="Files to move to unused/ folder")
+    column_mapping: dict = Field(default_factory=dict, description="Detected column rename dictionary")
+    reproject_files: List[str] = Field(default_factory=list, description="Files needing CRS reprojection")
+    merge_communes: dict = Field(default_factory=dict, description="Shapefiles to merge")
+    census_bbox_clip: Optional[str] = Field(default=None, description="Census file path needing BBOX clipping")
+    use_osm_residential_fallback: bool = Field(default=False, description="Whether to fall back to OSM buildings")
+

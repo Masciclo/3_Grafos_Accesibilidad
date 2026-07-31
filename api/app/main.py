@@ -147,6 +147,16 @@ def main():
             from core.execution_logger import ExecutionCacheManager
             ExecutionCacheManager.purge_temporary_logs(data_base_path, city_key)
 
+            # --- IngestionOntology v1: Pre-flight Data Sanitation Audit ---
+            try:
+                from core.agents.ingestion_agent import PreflightDiagnosticAuditor, SanitationRecipeExecutor
+                auditor = PreflightDiagnosticAuditor()
+                recipe = auditor.audit_city_raw_directory(city_key, city_meta, data_base_path, target_srid=target_srid, yes=args.force_yes)
+                if recipe and recipe.verdict != "INGESTABLE_READY":
+                    SanitationRecipeExecutor.execute_recipe(recipe, data_base_path, bbox=study_area_bbox)
+            except Exception as audit_err:
+                console.print(f"[bold yellow]Pre-flight Audit Note:[/] {audit_err}")
+
             # --- DataProvider: Satisfy Pre-requisites ---
             try:
                 validated_od = provider.satisfy_demand_matrix(city_key, target_srid, od_input_override=args.od_input, yes=args.force_yes)

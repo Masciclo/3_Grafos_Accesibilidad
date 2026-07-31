@@ -33,5 +33,42 @@ class TestUrbanOntology(unittest.TestCase):
         self.assertEqual(ontology.projects[0].budget_m, 1000.0)
         print("✅ test_smart_defaults_for_underspecified_prompt PASSED!")
 
+    def test_ingestion_ontology_schemas(self):
+        from core.ontology import (
+            IngestibilityStatus,
+            SpatialSanityType,
+            SchemaAlignmentType,
+            SanitationActionType,
+            FileDiagnosticReport,
+            SanitationRecipe
+        )
+        
+        report = FileDiagnosticReport(
+            filename="Zonas_EOD.shp",
+            filepath="data/santiago/raw/Zonas_EOD.shp",
+            status=IngestibilityStatus.INGESTABLE_REPAIRABLE,
+            spatial_sanity=SpatialSanityType.CRS_REPROJECT_NEEDED,
+            schema_alignment=SchemaAlignmentType.ALIAS_MAPPABLE,
+            detected_crs="EPSG:4326",
+            detected_columns=["ID_ZONA", "NOMBRE"],
+            proposed_actions=[SanitationActionType.REPROJECT_CRS, SanitationActionType.REMAP_COLUMNS],
+            issues_summary=["Non-standard column ID_ZONA", "CRS is EPSG:4326"]
+        )
+        
+        recipe = SanitationRecipe(
+            city_key="santiago",
+            target_srid=32719,
+            verdict=IngestibilityStatus.INGESTABLE_REPAIRABLE,
+            file_reports=[report],
+            column_mapping={"ID_ZONA": "zone_id"},
+            reproject_files=["Zonas_EOD.shp"]
+        )
+        
+        self.assertEqual(recipe.verdict, IngestibilityStatus.INGESTABLE_REPAIRABLE)
+        self.assertEqual(recipe.column_mapping["ID_ZONA"], "zone_id")
+        self.assertEqual(recipe.reproject_files[0], "Zonas_EOD.shp")
+        print("✅ test_ingestion_ontology_schemas PASSED!")
+
 if __name__ == "__main__":
     unittest.main()
+
