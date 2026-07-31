@@ -69,7 +69,11 @@ class RecommendationEngine:
             title="Grilling Session", border_style="green"
         ))
 
-        grill_agent = InteractiveGrillAgent()
+        from core.telemetry import NetworkOntologyProfiler
+        profiler = NetworkOntologyProfiler(self.db_config, self.net_prefix, reference_scenario)
+        ontology_data = profiler.profile_city()
+
+        grill_agent = InteractiveGrillAgent(ontology_data=ontology_data)
         
         # Start grilling loop with a simple welcome message
         messages = [

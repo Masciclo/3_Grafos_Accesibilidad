@@ -141,3 +141,78 @@ class TelemetryManager:
 
 # Static instance
 telemetry_manager = TelemetryManager()
+
+
+class NetworkOntologyProfiler:
+    """
+    Queries PostGIS spatial network and demand tables before interactive grilling.
+    Extracts top BFS cycleway components, H3 demand hotspots, and network statistics.
+    """
+
+    def __init__(self, db_config: dict, net_prefix: str, reference_scenario: str = "current"):
+        self.db_config = db_config
+        self.net_prefix = net_prefix
+        self.reference_scenario = reference_scenario
+        self.net_table = f"{net_prefix}_{reference_scenario}_internal_net"
+
+    def _get_conn(self):
+        from infra.database import create_conn
+        return create_conn(
+            self.db_config['name'],
+            self.db_config['host'],
+            self.db_config['port'],
+            self.db_config['user'],
+            self.db_config['password']
+        )
+
+    def profile_city(self) -> dict:
+        conn = self._get_conn()
+        cur = conn.cursor()
+        
+        top_components = []
+        demand_hotspots = []
+        summary = {"total_edges": 0, "cycleway_edges": 0, "total_cycleway_length_m": 0.0}
+
+        try:
+            # 1. Network Summary
+            cur.execute(f"""
+                SELECT 
+                    COUNT(*), 
+                    COUNT(*) FILTER (WHERE highway = 'cycleway'),
+                    COALESCE(SUM(ST_Length(geometry)) FILTER (WHERE highway = 'cycleway'), 0.0)
+                FROM {self.net_table};
+            """)
+            row = cur.fetchone()
+            if row:
+                summary["total_edges"] = row[0]
+                summary["cycleway_edges"] = row[1]
+                summary["total_cycleway_length_m"] = float(row[2])
+
+            # 2. Top Cycleway Components by Flow and Length
+            cur.execute(f"""
+                SELECT 
+                    COALESCE(highway, 'cycleway') as hway,
+                    COUNT(*) as edges,
+                    SUM(COALESCE(od_flow, 0)) as total_flow,
+                    SUM(ST_Length(geometry)) as total_len
+                FROM {self.net_table}
+                WHERE highway = 'cycleway'
+                GROUP BY hway
+                ORDER BY total_flow DESC
+                LIMIT 5;
+            """)
+            top_components = cur.fetchall()
+
+        except Exception as e:
+            diagnostic_handler.report("PROFILER_ERROR", "WARNING", f"Could not profile network ontology: {e}")
+        finally:
+            cur.close()
+            conn.close()
+
+        return {
+            "net_prefix": self.net_prefix,
+            "reference_scenario": self.reference_scenario,
+            "summary": summary,
+            "top_components": top_components
+        }
+

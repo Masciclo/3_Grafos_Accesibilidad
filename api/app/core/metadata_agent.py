@@ -170,9 +170,35 @@ class GrillSessionTurn(BaseModel):
     config: Optional[ProjectConfig] = Field(None, description="Only fill this when status is 'COMPLETE'. The finalized project configuration.")
 
 class InteractiveGrillAgent:
-    def __init__(self):
+    def __init__(self, ontology_data: Optional[dict] = None):
         self.client = genai.Client()
         self.agents_dir = os.path.join(os.path.dirname(__file__), "agents")
+        self.ontology_data = ontology_data
+        if self.ontology_data:
+            self.render_city_diagnostic_panel(self.ontology_data)
+
+    def render_city_diagnostic_panel(self, ontology: dict):
+        """Renders the Rich terminal City Urban Diagnostic Report panel."""
+        try:
+            from rich.console import Console
+            from rich.panel import Panel
+            
+            city = ontology.get("net_prefix", "city").upper()
+            summary = ontology.get("summary", {})
+            components = ontology.get("top_components", [])
+            
+            body = (
+                f"[bold cyan]🏙️ CITY URBAN DIAGNOSTIC REPORT: {city}[/bold cyan]\n"
+                f"• Total Street Edges: [bold]{summary.get('total_edges', 0):,}[/bold]\n"
+                f"• Existing Cycleway Edges: [bold]{summary.get('cycleway_edges', 0):,}[/bold] ({summary.get('total_cycleway_length_m', 0)/1000:.1f} km total)\n\n"
+                f"[bold yellow]📍 Major Cycleway Components (Flow Anchors):[/bold yellow]\n"
+            )
+            for idx, c in enumerate(components[:3]):
+                body += f"  #{idx+1}: {c[1]:,} edges | Flow: {int(c[2]):,} trips/day | Length: {c[3]/1000:.1f} km\n"
+                
+            Console().print(Panel(body, title="Urban Telemetry Profiler (+CICLO ONTOLOGY v1)", border_style="cyan"))
+        except Exception as e:
+            pass
 
     def _load_prompt(self, filename: str) -> str:
         path = os.path.join(self.agents_dir, filename)
@@ -181,6 +207,9 @@ class InteractiveGrillAgent:
 
     def grill_turn(self, messages_history: list[dict]) -> GrillSessionTurn:
         system_instruction = self._load_prompt("grill_consolidado.md")
+        
+        if self.ontology_data:
+            system_instruction += f"\n\nCITY ONTOLOGY CONTEXT:\n{json.dumps(self.ontology_data, default=str)}"
         
         contents = []
         for msg in messages_history:
