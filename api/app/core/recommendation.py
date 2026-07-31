@@ -74,6 +74,7 @@ class RecommendationEngine:
         ontology_data = profiler.profile_city()
 
         grill_agent = InteractiveGrillAgent(ontology_data=ontology_data)
+        grill_agent.render_city_diagnostic_panel()
         
         # Start grilling loop with a simple welcome message
         messages = [

@@ -174,18 +174,20 @@ class InteractiveGrillAgent:
         self.client = genai.Client()
         self.agents_dir = os.path.join(os.path.dirname(__file__), "agents")
         self.ontology_data = ontology_data
-        if self.ontology_data:
-            self.render_city_diagnostic_panel(self.ontology_data)
 
-    def render_city_diagnostic_panel(self, ontology: dict):
+    def render_city_diagnostic_panel(self, ontology: Optional[dict] = None):
         """Renders the Rich terminal City Urban Diagnostic Report panel."""
+        data = ontology or self.ontology_data
+        if not data:
+            return
+            
         try:
             from rich.console import Console
             from rich.panel import Panel
             
-            city = ontology.get("net_prefix", "city").upper()
-            summary = ontology.get("summary", {})
-            components = ontology.get("top_components", [])
+            city = data.get("net_prefix", "city").upper()
+            summary = data.get("summary", {})
+            components = data.get("top_components", [])
             
             body = (
                 f"[bold cyan]🏙️ CITY URBAN DIAGNOSTIC REPORT: {city}[/bold cyan]\n"
@@ -198,7 +200,8 @@ class InteractiveGrillAgent:
                 
             Console().print(Panel(body, title="Urban Telemetry Profiler (+CICLO ONTOLOGY v1)", border_style="cyan"))
         except Exception as e:
-            pass
+            from ui.components import diagnostic_handler
+            diagnostic_handler.report("UI_PANEL_ERROR", "WARNING", f"Failed to render city diagnostic panel: {e}")
 
     def _load_prompt(self, filename: str) -> str:
         path = os.path.join(self.agents_dir, filename)
