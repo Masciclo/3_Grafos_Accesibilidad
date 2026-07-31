@@ -19,6 +19,7 @@ from core.metadata_agent import MetadataAgent, InteractiveGrillAgent, ProjectCon
 from core.overpass_client import OverpassClient
 from infra.database import create_conn, execute_query
 from infra.ingestion import create_abbreviation
+from core.execution_logger import ExecutionLogger
 
 console = Console()
 
@@ -26,9 +27,19 @@ class RecommendationEngine:
     def __init__(self, db_config: dict, data_base_path: str, city_key: str, srid: int):
         self.db_config = db_config
         self.data_base_path = data_base_path
-        self.city_key = city_key
         self.srid = srid
-        self.net_prefix = create_abbreviation(city_key)
+        
+        # If city_key contains a comma, it's target_loc (osm_name)
+        if "," in city_key:
+            self.city_key = city_key.split(",")[0].strip().lower()
+            self.net_prefix = create_abbreviation(city_key)
+        else:
+            self.city_key = city_key.strip().lower()
+            if self.city_key == "valdivia":
+                self.net_prefix = "valdchil"
+            else:
+                self.net_prefix = create_abbreviation(city_key)
+        self.logger = None
 
     def _get_conn(self):
         return create_conn(
@@ -47,6 +58,11 @@ class RecommendationEngine:
         3. Executes the custom cost-effective growth loop sequentially.
         4. Exports the consolidated upgraded network GeoJSON.
         """
+        scenario_id = f"rec_{int(time.time())}"
+        self.logger = ExecutionLogger(self.data_base_path, self.city_key, scenario_id)
+        self.logger.set_phase("01_recommendation")
+        self.logger.log(f"Initialized RecommendationEngine for city: {self.city_key}, scenario: {scenario_id}")
+
         console.print(Panel(
             "[bold green]🤖 INITIALIZING INTERACTIVE PROJECT GRILLING SESSION (+CICLO)[/]\n"
             "We will step-by-step define your bike lane expansion projects, custom growth algorithms, and locations.",
@@ -98,7 +114,7 @@ class RecommendationEngine:
             if choice == "Y":
                 break
             elif choice == "R":
-                feedback = Prompt.ask("[bold red]Enter your comments or desired modifications[/]")
+                feedback = Prompt.ask("[bold cyan]Enter your comments or desired modifications[/]")
                 messages.append({"role": "user", "content": f"Feedback/Modifications: {feedback}"})
                 while True:
                     turn = grill_agent.grill_turn(messages)
@@ -135,11 +151,11 @@ class RecommendationEngine:
             seed_edge_ids = self._detect_growth_seeds(None, reference_scenario)
             
         projects_list = []
-        # Support replicating config across the requested number of projects
+        # Support replicating config across the requested number of projects with distinct topological seeds
         for idx in range(project_config.num_projects):
             projects_list.append({
                 "config": project_config,
-                "seed_edge_ids": seed_edge_ids if idx == 0 else self._detect_growth_seeds(None, reference_scenario)
+                "seed_edge_ids": self._detect_growth_seeds(None, reference_scenario, offset=idx)
             })
 
         # Display final project table only if there are multiple projects
@@ -273,10 +289,10 @@ class RecommendationEngine:
             
         return seed_edge_ids
 
-    def _detect_growth_seeds(self, poi_path: str, reference_scenario: str) -> list[int]:
+    def _detect_growth_seeds(self, poi_path: str, reference_scenario: str, offset: int = 0) -> list[int]:
         """
         Groups cycleways into components, selects the component with the highest baseline flow,
-        and then finds the highest-flow street segment within 500 meters of that component.
+        and then finds the highest-flow street segment within 500 meters of that component (offset by rank).
         """
         net_table = f"{self.net_prefix}_{reference_scenario}_internal_net"
         conn = self._get_conn()
@@ -301,8 +317,8 @@ class RecommendationEngine:
                 WHERE curr.highway != 'cycleway'
                   AND curr.highway NOT IN ('motorway', 'trunk')
                 ORDER BY (COALESCE(base.od_flow, 0) - COALESCE(curr.od_flow, 0)) DESC
-                LIMIT 1;
-            """)
+                LIMIT 1 OFFSET %s;
+            """, (offset,))
             fallback = cur.fetchone()
             cur.close()
             conn.close()
@@ -350,16 +366,16 @@ class RecommendationEngine:
         # Sort components by total baseline flow descending
         component_stats.sort(key=lambda x: x[1], reverse=True)
 
-        console.print(f"Detected [bold]{len(components)}[/] disconnected cycleway clusters in reference scenario.")
-        console.print("[bold cyan]Top 5 cycleway clusters sorted by baseline flow:[/]")
-        for idx, (comp, flow, size) in enumerate(component_stats[:5]):
-            console.print(f"  - Cluster {idx+1}: {size} edges, Total Flow: {round(flow, 1)} active trips/day (Example Edge ID: {comp[0]})")
+        if offset == 0:
+            console.print(f"Detected [bold]{len(components)}[/] disconnected cycleway clusters in reference scenario.")
+            console.print("[bold cyan]Top 5 cycleway clusters sorted by baseline flow:[/]")
+            for idx, (comp, flow, size) in enumerate(component_stats[:5]):
+                console.print(f"  - Cluster {idx+1}: {size} edges, Total Flow: {round(flow, 1)} active trips/day (Example Edge ID: {comp[0]})")
 
         # Automatically select the highest flow component as the seed X_seed
         selected_component = component_stats[0][0]
-        console.print(f"Selected Cluster 1 (Highest Flow: {round(component_stats[0][1], 1)} trips/day) as seed component ($X_{{seed}}$).")
 
-        # Find the highest-flow street segment within 500m of the selected component's geometries
+        # Find the highest-flow street segment within 500m of the selected component's geometries (offset by project index)
         selected_edge_ids_str = ",".join(map(str, selected_component))
         cur.execute(f"""
             SELECT s.id, COALESCE(s.od_flow, 0) as flow
@@ -372,19 +388,19 @@ class RecommendationEngine:
                     AND ST_DWithin(ST_Transform(s.geometry, 32718), ST_Transform(c.geometry, 32718), 500)
               )
             ORDER BY COALESCE(s.od_flow, 0) DESC
-            LIMIT 1;
-        """)
+            LIMIT 1 OFFSET %s;
+        """, (offset,))
         row = cur.fetchone()
 
         if row:
             starting_edge_id = row[0]
             starting_flow = row[1]
-            console.print(f"  - Spawning on adjacent high-flow street segment: ID {starting_edge_id} (Flow: {round(starting_flow, 1)} trips/day)")
+            console.print(f"  - [Project Seed Rank #{offset+1}] Spawning on adjacent high-flow street segment: ID {starting_edge_id} (Flow: {round(starting_flow, 1)} trips/day)")
         else:
             # Fallback to the highest flow edge inside the cycleway cluster itself if no adjacent streets found
             selected_component.sort(key=lambda eid: edge_flows.get(eid, 0.0), reverse=True)
-            starting_edge_id = selected_component[0]
-            console.print(f"  - [Fallback] Spawning inside cluster itself: ID {starting_edge_id} (Flow: {round(edge_flows.get(starting_edge_id, 0.0), 1)} trips/day)")
+            starting_edge_id = selected_component[min(offset, len(selected_component)-1)]
+            console.print(f"  - [Fallback Rank #{offset+1}] Spawning inside cluster itself: ID {starting_edge_id} (Flow: {round(edge_flows.get(starting_edge_id, 0.0), 1)} trips/day)")
 
         cur.close()
         conn.close()
@@ -466,7 +482,9 @@ class RecommendationEngine:
         for r in demand_rows:
             population_pairs.append((r[0], r[1], float(r[2])))
             
-        sample_size = min(sample_size, len(population_pairs))
+        # Adaptive sample size guard for large networks (prevents PostgreSQL OOM crashes on Santiago/Valparaiso)
+        max_safe_sample = 100 if len(population_pairs) > 50000 else 500
+        sample_size = min(sample_size, len(population_pairs), max_safe_sample)
         Q = random.sample(population_pairs, sample_size)
         console.print(f"Sampled [bold]{len(Q)}[/] active OD pairs for BUS evaluation (from total {len(population_pairs)} active pairs).")
 
@@ -609,23 +627,14 @@ class RecommendationEngine:
                             pass
 
                     # Topological Search Compass: look-ahead H=3, adaptive to H=5
-                    orientation_multiplier = 1.0
+                    topological_multiplier = 1.0
                     try:
-                        cur.execute(f"SELECT ST_X(ST_Centroid(geometry)), ST_Y(ST_Centroid(geometry)) FROM {net_table} WHERE id = %s", (cand_id,))
-                        cand_x, cand_y = cur.fetchone()
-                        
-                        look_flow, end_x, end_y = self._topological_lookahead_compass(cur, cand_id, 3, net_table, active_nodes_str)
+                        look_flow, _, _ = self._topological_lookahead_compass(cur, cand_id, 3, net_table, active_nodes_str)
                         # Adaptive depth
                         if look_flow < 1000.0:
-                            look_flow, end_x, end_y = self._topological_lookahead_compass(cur, cand_id, 5, net_table, active_nodes_str)
+                            look_flow, _, _ = self._topological_lookahead_compass(cur, cand_id, 5, net_table, active_nodes_str)
                         
-                        if end_x != 0.0 or end_y != 0.0:
-                            v_look = (end_x - cand_x, end_y - cand_y)
-                            mag_look = math.sqrt(v_look[0]**2 + v_look[1]**2)
-                            mag_target = math.sqrt(v_target[0]**2 + v_target[1]**2)
-                            if mag_look > 0 and mag_target > 0:
-                                cos_theta = (v_look[0]*v_target[0] + v_look[1]*v_target[1]) / (mag_look * mag_target)
-                                orientation_multiplier = max(0.1, cos_theta)
+                        topological_multiplier = math.log10(look_flow + 10.0)
                     except Exception:
                         pass
 
@@ -635,8 +644,8 @@ class RecommendationEngine:
                     else:
                         budget_penalty = 1.0
 
-                    cer = ((float(captured_count) * gravity_multiplier * orientation_multiplier) / (adjusted_len + 30.0)) * budget_penalty
-                    fallback_cer = ((max(float(base_flow), 1e-5) * gravity_multiplier * orientation_multiplier) / (adjusted_len + 30.0)) * budget_penalty
+                    cer = ((float(captured_count) * gravity_multiplier * topological_multiplier) / (adjusted_len + 30.0)) * budget_penalty
+                    fallback_cer = ((max(float(base_flow), 1e-5) * gravity_multiplier * topological_multiplier) / (adjusted_len + 30.0)) * budget_penalty
                     
                     if cer > best_cer:
                         best_cer = cer
@@ -696,6 +705,10 @@ class RecommendationEngine:
                 pass
             
             # Informative print regarding budget vs physical length
+            log_msg = f"Iteration {iteration}: Selected Edge ID {best_candidate} (Length: {round(best_length, 1)}m, Budget Cost: {round(budget_cost, 1)}m, CER: {round(best_cer, 5)})"
+            if self.logger:
+                self.logger.log(log_msg)
+
             if budget_cost == 0.0:
                 console.print(f"🎉 Selected Edge ID [bold]{best_candidate}[/] (Length: {round(best_length, 1)}m, [green]Stitched Free Cycleway[/], CER: {round(best_cer, 5)})")
             elif budget_remaining < 0.0:

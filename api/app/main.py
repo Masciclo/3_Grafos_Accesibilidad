@@ -58,9 +58,9 @@ def main():
     parser.add_argument("--cleanup", dest="cleanup", action="store_true")
     parser.add_argument("--mapping", dest="mapping", action="store_true", help="Generate interactive academic map suite.")
     parser.add_argument("--buffer_size", dest="buffer_size", type=int, default=15)
-    parser.add_argument("--mr_distance", dest="mr_distance", type=float, default=5.0, help="Magnetismo a Referencia (Phase 18)")
-    parser.add_argument("--ma_distance", dest="ma_distance", type=float, default=7.0, help="Magnetismo a Antecesor (Phase 18)")
-    parser.add_argument("--zp_distance", dest="zp_distance", type=float, default=25.0, help="Zona de Proyecto Audit Clip (Phase 18)")
+    parser.add_argument("--ref_snap_dist", dest="ref_snap_dist", type=float, default=5.0, help="Reference Snapping Distance (buffer size to align streets to project)")
+    parser.add_argument("--parent_lineage_dist", dest="parent_lineage_dist", type=float, default=7.0, help="Parent Lineage Distance (search radius to map refactored segments back to baseline)")
+    parser.add_argument("--project_influence_dist", dest="project_influence_dist", type=float, default=25.0, help="Project Influence Distance (clipping buffer size around project for audit)")
     parser.add_argument("--imp_primary", dest="imp_primary", type=float, default=15.0)
     parser.add_argument("--imp_secondary", dest="imp_secondary", type=float, default=7.0)
     parser.add_argument("--imp_tertiary", dest="imp_tertiary", type=float, default=3.0)
@@ -143,9 +143,13 @@ def main():
             
             study_area_bbox = city_meta.get("bbox")
 
+            # --- ExecutionCacheManager: Purge temporary city logs from previous uncommitted runs ---
+            from core.execution_logger import ExecutionCacheManager
+            ExecutionCacheManager.purge_temporary_logs(data_base_path, city_key)
+
             # --- DataProvider: Satisfy Pre-requisites ---
             try:
-                validated_od = provider.satisfy_demand_matrix(city_key, target_srid, od_input_override=args.od_input)
+                validated_od = provider.satisfy_demand_matrix(city_key, target_srid, od_input_override=args.od_input, yes=args.force_yes)
             except Exception as e:
                 console.print(f"[bold red]DataProvider Error:[/] {str(e)}")
                 continue
@@ -191,7 +195,7 @@ def main():
                 console.print(ui.get_audit_layout(census_map, od_map, spatial_status))
                 
                 from rich.prompt import Prompt
-                choice = Prompt.ask("[bold yellow]¿Qué deseas hacer? (C: Continuar, R: Redefinir)[/]", choices=["C", "c", "R", "r"], show_choices=False).upper()
+                choice = Prompt.ask("[bold yellow]What would you like to do? (C: Continue, R: Redefine)[/]", choices=["C", "c", "R", "r"], show_choices=False).upper()
                 
                 if choice == "R":
                     args.location = None 
@@ -267,9 +271,13 @@ def main():
                 imp_secondary=args.imp_secondary, imp_tertiary=args.imp_tertiary,
                 imp_local=args.imp_local, imp_bike=args.imp_bike,
                 inhibit=bool(args.inhibit), disinhibit=bool(args.disinhibit),
-                cleanup=args.cleanup, mapping=args.mapping
+                cleanup=args.cleanup, mapping=args.mapping,
+                ref_snap_dist=args.ref_snap_dist,
+                parent_lineage_dist=args.parent_lineage_dist,
+                project_influence_dist=args.project_influence_dist
             )
             
+            args.od_input = validated_od
             ui = PipelineUI(target_loc, target_srid, args=args)
             observer = RichProgressAdapter(ui)
             
@@ -297,7 +305,7 @@ def main():
         # Post-execution logic
         if interactive_mode:
             # Task 13.8: Wait for user acknowledgment before returning to Screen 1
-            Prompt.ask("\n[bold yellow]Análisis Completado. Presiona [ENTER] para regresar a la consola de consulta...[/]")
+            Prompt.ask("\n[bold yellow]Analysis Completed. Press [ENTER] to return to the query console...[/]")
             args.location = None
         else:
             break
