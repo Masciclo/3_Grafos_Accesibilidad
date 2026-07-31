@@ -572,16 +572,4 @@ class SanitationRecipeExecutor:
 
         print("✓ [SanitationExecutor] Recipe execution completed successfully.")
         return True
-                if 'lat' in c_df.columns and 'lon' in c_df.columns:
-                    mask = (c_df['lon'] >= xmin) & (c_df['lon'] <= xmax) & (c_df['lat'] >= ymin) & (c_df['lat'] <= ymax)
-                    c_df = c_df[mask]
-
-                proc_census_path = os.path.join(proc_dir, "census.parquet")
-                c_df.to_parquet(proc_census_path)
-                print(f"   ✓ Clipped census dataset saved to {proc_census_path} ({len(c_df)} rows).")
-            except Exception as e:
-                print(f"   ✕ Census BBOX clipping failed: {e}")
-
-        print("✓ [SanitationExecutor] Recipe execution completed successfully.")
-        return True
 
