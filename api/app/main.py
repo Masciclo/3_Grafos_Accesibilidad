@@ -154,6 +154,12 @@ def main():
                 recipe = auditor.audit_city_raw_directory(city_key, city_meta, data_base_path, target_srid=target_srid, yes=args.force_yes)
                 if recipe and recipe.verdict != "INGESTABLE_READY":
                     SanitationRecipeExecutor.execute_recipe(recipe, data_base_path, bbox=study_area_bbox)
+                
+                # If clipped census file was created in proc/, set args.census_input
+                proc_census = os.path.join(data_base_path, "data", city_key, "proc", "census.parquet")
+                if os.path.exists(proc_census):
+                    args.census_input = proc_census
+                    console.print(f"[bold green]Ingestion Sanitation:[/] Using sanitized clipped census file: {proc_census}")
             except Exception as audit_err:
                 console.print(f"[bold yellow]Pre-flight Audit Note:[/] {audit_err}")
 

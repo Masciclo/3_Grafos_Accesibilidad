@@ -560,7 +560,15 @@ class SanitationRecipeExecutor:
                 buffer_deg = 0.15
                 xmin, ymin, xmax, ymax = xmin - buffer_deg, ymin - buffer_deg, xmax + buffer_deg, ymax + buffer_deg
                 
-                if 'lat' in c_df.columns and 'lon' in c_df.columns:
+                if 'geometry' in c_df.columns:
+                    try:
+                        from shapely.geometry import box
+                        bbox_box = box(xmin, ymin, xmax, ymax)
+                        mask = c_df['geometry'].apply(lambda g: g is not None and g.intersects(bbox_box))
+                        c_df = c_df[mask]
+                    except Exception:
+                        pass
+                elif 'lat' in c_df.columns and 'lon' in c_df.columns:
                     mask = (c_df['lon'] >= xmin) & (c_df['lon'] <= xmax) & (c_df['lat'] >= ymin) & (c_df['lat'] <= ymax)
                     c_df = c_df[mask]
 
