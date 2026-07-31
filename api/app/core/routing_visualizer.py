@@ -3,6 +3,7 @@ import traceback
 from enum import Enum
 from typing import Dict, Any, Optional, Protocol, List, Tuple
 from dataclasses import dataclass
+import pandas as pd
 import geopandas as gpd
 from sqlalchemy import create_engine, text
 from ui.components import diagnostic_handler
@@ -182,7 +183,34 @@ class RoutingVisualizer:
             reporter = AcademicReporter(style_provider, exporter, observer)
             
             final_net_table = f"{scenario_prefix}_network"
-            net_gdf = gpd.read_postgis(f"SELECT * FROM {final_net_table}", engine, geom_col='geometry')
+            
+            # Check the size of the network table first to optimize loading on large cities like Santiago
+            with engine.connect() as conn:
+                count_res = conn.execute(text(f"SELECT COUNT(*) FROM {final_net_table}")).fetchone()
+                net_size = count_res[0] if count_res else 0
+                
+            if net_size > 50000:
+                diagnostic_handler.report("LARGE_NETWORK_MAPPING", "INFO", f"Large network detected ({net_size} edges). Filtering background streets within 1.5km of active corridors...")
+                query = f"""
+                    SELECT * FROM {final_net_table} 
+                    WHERE od_flow > 0 
+                       OR is_project = TRUE
+                       OR highway IN ('primary', 'secondary', 'tertiary', 'cycleway', 'trunk', 'motorway')
+                       OR original_highway IN ('primary', 'secondary', 'tertiary', 'cycleway', 'trunk', 'motorway')
+                       OR ST_DWithin(
+                            geometry,
+                            (
+                                SELECT ST_Union(geometry) 
+                                FROM {final_net_table} 
+                                WHERE od_flow > 0 OR is_project = TRUE
+                            ),
+                            1500
+                       )
+                """
+            else:
+                query = f"SELECT * FROM {final_net_table}"
+                
+            net_gdf = gpd.read_postgis(query, engine, geom_col='geometry')
             
             mask_col = 'participating_in_analysis'
             mcp_gdf = net_gdf[net_gdf[mask_col] == True] if mask_col in net_gdf.columns else net_gdf
@@ -193,10 +221,14 @@ class RoutingVisualizer:
             if observer:
                 observer.on_progress_update(None, "ADVANCE_MAPPING", increment=1)
                 
-            # Generate active scenario flow maps: full network flow always, bikelane flow only for reference case
+            # Generate active scenario flow maps: full network flow & bikelane flow for all scenarios
             net_flow_plot = reporter.generate_map(net_gdf, MapType.FLOW, master_bbox, scenario_prefix, total_trips)
-            if not config.projects_input:
-                reporter.generate_map(net_gdf, MapType.FLOW_BIKELANES, master_bbox, scenario_prefix, total_trips)
+            bikelane_flow_plot = reporter.generate_map(net_gdf, MapType.FLOW_BIKELANES, master_bbox, scenario_prefix, total_trips)
+            
+            # Generate Project Performance Map if projects or recommendations are present
+            has_projects = bool(config.projects_input or config.scenario_id.startswith("rec_") or ('is_project' in net_gdf.columns and net_gdf['is_project'].any()))
+            if has_projects:
+                reporter.generate_map(net_gdf, MapType.PROJECT_PERFORMANCE, master_bbox, scenario_prefix, total_trips)
             
             plots = []
             
@@ -265,7 +297,7 @@ class RoutingVisualizer:
             if config.projects_input:
                 reporter.generate_map(net_gdf, MapType.PROJECT_PERFORMANCE, master_bbox, scenario_prefix, total_trips)
 
-            # Generate Standalone H3 Purpose Maps if columns exist in H3 layer
+            # Generate Standalone H3 Purpose Maps dynamically
             h3_table = f"{scenario_prefix}_h3"
             with self.context.conn.cursor() as cur:
                 cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = %s)", (h3_table,))
@@ -274,31 +306,82 @@ class RoutingVisualizer:
             if h3_exists:
                 try:
                     h3_gdf = gpd.read_postgis(f"SELECT * FROM {h3_table}", engine, geom_col='geometry')
-                    if 'trips_returning_home' in h3_gdf.columns and 'trips_outgoing_destinations' in h3_gdf.columns:
+                    h3_purpose_cols = [c for c in h3_gdf.columns if c.startswith('trips_') and c != 'trips']
+                    
+                    if h3_purpose_cols:
                         from core.academic_maps import AcademicMapGenerator
                         generator = AcademicMapGenerator(output_dir=getattr(reporter.exporter, 'output_dir', 'data/maps'))
                         
-                        # Map A: Trips Returning Home (Amethyst Purple: 142, 68, 173)
-                        generator.generate_h3_purpose_map(
-                            h3_gdf, net_gdf, scenario_prefix,
-                            column='trips_returning_home',
-                            title="Trips Returning Home (H3 Daily Density)",
-                            color_rgb=(142, 68, 173),
-                            legend_title="Homebound Trips",
-                            bbox=master_bbox
-                        )
+                        # Map specific trip purposes to sequential ColorBrewer color scales
+                        purpose_colorscales = {
+                            'trips_work': 'OrRd',
+                            'trips_study': 'BuGn',
+                            'trips_shopping': 'PuRd',
+                            'trips_personal': 'PuBu',
+                            'trips_recreational': 'YlGn',
+                            'trips_returning_home': 'BuPu'
+                        }
                         
-                        # Map B: Trips Outgoing Destinations (Crimson Red: 224, 86, 86)
-                        generator.generate_h3_purpose_map(
-                            h3_gdf, net_gdf, scenario_prefix,
-                            column='trips_outgoing_destinations',
-                            title="Trips Outgoing to Destinations (H3 Daily Density)",
-                            color_rgb=(224, 86, 86),
-                            legend_title="Activity Trips",
-                            bbox=master_bbox
-                        )
+                        for idx, col in enumerate(h3_purpose_cols):
+                            clean_name = col.replace("trips_", "").replace("_", " ").title()
+                            color_rgb = purpose_colorscales.get(col, 'OrRd')
+                            
+                            generator.generate_h3_purpose_map(
+                                h3_gdf, net_gdf, scenario_prefix,
+                                column=col,
+                                title=f"{clean_name} Trips (H3 Daily Density)",
+                                color_rgb=color_rgb,
+                                legend_title=clean_name,
+                                bbox=master_bbox
+                            )
                 except Exception as map_err:
                     diagnostic_handler.report("H3_MAPPING_FAILED", "WARNING", f"Failed to generate standalone H3 maps: {map_err}")
+
+            # Generate Standalone Flow Purpose Maps dynamically (Option B)
+            flow_purpose_table = f"{tables['net']}_flow_by_purpose"
+            with self.context.conn.cursor() as cur:
+                cur.execute("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = %s)", (flow_purpose_table,))
+                flow_table_exists = cur.fetchone()[0]
+                
+            if flow_table_exists:
+                try:
+                    with self.context.conn.cursor() as cur:
+                        cur.execute(f"SELECT DISTINCT purpose FROM {flow_purpose_table}")
+                        active_purposes = [row[0] for row in cur.fetchall()]
+                        
+                    if active_purposes:
+                        from core.academic_maps import AcademicMapGenerator
+                        generator = AcademicMapGenerator(output_dir=getattr(reporter.exporter, 'output_dir', 'data/maps'))
+                        
+                        # Banner color palette
+                        banner_colors = [
+                            (131, 56, 236),  # Purple (#8338ec)
+                            (58, 134, 255),  # Blue (#3a86ff)
+                            (255, 0, 110),   # Hot Pink (#ff006e)
+                            (251, 86, 7),    # Orange-Red (#fb5607)
+                            (255, 190, 11)   # Amber Yellow (#ffbe0b)
+                        ]
+                        
+                        for idx, purpose in enumerate(active_purposes):
+                            # Load flow values for this purpose and join with net_gdf
+                            flow_df = pd.read_sql(f"SELECT edge_id, flow FROM {flow_purpose_table} WHERE purpose = '{purpose}'", engine)
+                            # Merge flow into net_gdf copy on edge_id
+                            purpose_net_gdf = net_gdf.merge(flow_df.rename(columns={'flow': 'purpose_flow'}), on='edge_id', how='left')
+                            purpose_net_gdf['purpose_flow'] = purpose_net_gdf['purpose_flow'].fillna(0.0)
+                            
+                            clean_name = purpose.replace("_", " ").title()
+                            color_rgb = banner_colors[idx % len(banner_colors)]
+                            
+                            generator.generate_flow_purpose_map(
+                                purpose_net_gdf, net_gdf, scenario_prefix,
+                                column='purpose_flow',
+                                title=f"{clean_name} Trip Flow (Betweenness Centrality)",
+                                color_rgb=color_rgb,
+                                legend_title=clean_name,
+                                bbox=master_bbox
+                            )
+                except Exception as flow_map_err:
+                    diagnostic_handler.report("FLOW_PURPOSE_MAPPING_FAILED", "WARNING", f"Failed to generate purpose flow maps: {flow_map_err}")
 
         except Exception as e:
             diagnostic_handler.report("MAPPING_FAILED", "ERROR", f"Mapping failed: {e} | {traceback.format_exc().splitlines()[-1]}")
