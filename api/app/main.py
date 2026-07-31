@@ -56,7 +56,7 @@ def main():
     parser.add_argument("--reference_scenario", dest="reference_scenario", type=str)
     parser.add_argument("--yes", dest="force_yes", action="store_true")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true")
-    parser.add_argument("--mapping", dest="mapping", action="store_true", help="Generate interactive academic map suite.")
+    parser.add_argument("--mapping", dest="mapping", action="store_true", default=True, help="Generate interactive academic map suite.")
     parser.add_argument("--buffer_size", dest="buffer_size", type=int, default=15)
     parser.add_argument("--ref_snap_dist", dest="ref_snap_dist", type=float, default=5.0, help="Reference Snapping Distance (buffer size to align streets to project)")
     parser.add_argument("--parent_lineage_dist", dest="parent_lineage_dist", type=float, default=7.0, help="Parent Lineage Distance (search radius to map refactored segments back to baseline)")
