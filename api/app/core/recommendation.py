@@ -188,8 +188,9 @@ class RecommendationEngine:
                 console.print("[bold red]Simulation cancelled by user.[/]")
                 return ""
 
-        # Solve greedy growth sequentially for each approved project
+        # Solve greedy growth sequentially for each approved project (Cumulative Growth)
         all_upgrades = []
+        accumulated_upgrades = set()
         for idx, proj in enumerate(projects_list):
             config = proj["config"]
             seeds = proj["seed_edge_ids"]
@@ -202,10 +203,12 @@ class RecommendationEngine:
                 sample_size=sample_size,
                 highway_lambdas=lambdas_dict,
                 gravity_attractor=config.location_and_orientation.gravity_attractor,
-                study_area_bbox=study_area_bbox
+                study_area_bbox=study_area_bbox,
+                accumulated_upgrades=accumulated_upgrades
             )
             proj["selected_edges"] = selected
             all_upgrades.extend(selected)
+            accumulated_upgrades.update(selected)
 
         # Deduplicate
         all_upgrades = list(set(all_upgrades))
@@ -454,9 +457,10 @@ class RecommendationEngine:
             return float(row[0]), float(row[1]), float(row[2])
         return 0.0, 0.0, 0.0
 
-    def _solve_greedy_growth(self, seed_edge_ids: list[int], reference_scenario: str, budget: float, sample_size: int, highway_lambdas: dict = None, gravity_attractor: str = None, study_area_bbox: list = None) -> list[int]:
+    def _solve_greedy_growth(self, seed_edge_ids: list[int], reference_scenario: str, budget: float, sample_size: int, highway_lambdas: dict = None, gravity_attractor: str = None, study_area_bbox: list = None, accumulated_upgrades: set[int] = None) -> list[int]:
         """
         Executes the greedy selection loop using Cost-Effectiveness Ratio (CER) and Uniform Sampling (BUS).
+        Supports Cumulative Greedy Growth by recognizing accumulated_upgrades as built bikelanes and latch points.
         """
         net_table = f"{self.net_prefix}_{reference_scenario}_internal_net"
         conn = self._get_conn()
@@ -494,6 +498,7 @@ class RecommendationEngine:
         console.print(f"Sampled [bold]{len(Q)}[/] active OD pairs for BUS evaluation (from total {len(population_pairs)} active pairs).")
 
         active_edges = set(seed_edge_ids)
+        acc_edges = set(accumulated_upgrades) if accumulated_upgrades else set()
         budget_remaining = budget
         selected_upgrades = []
 
@@ -503,6 +508,14 @@ class RecommendationEngine:
         cur.execute(f"SELECT source, target FROM {net_table} WHERE id = %s", (seed_edge_id,))
         seed_src, seed_tgt = cur.fetchone()
         active_nodes = {seed_src, seed_tgt}
+
+        # If accumulated projects exist, register their node endpoints as active latch points
+        if acc_edges:
+            acc_ids_tmp = ",".join(map(str, acc_edges))
+            cur.execute(f"SELECT DISTINCT source, target FROM {net_table} WHERE id IN ({acc_ids_tmp})")
+            for acc_s, acc_t in cur.fetchall():
+                active_nodes.add(acc_s)
+                active_nodes.add(acc_t)
 
         origins = [p[0] for p in Q]
         destinations = [p[1] for p in Q]
@@ -542,7 +555,8 @@ class RecommendationEngine:
                 v_target = (last_x - seed_x, last_y - seed_y)
             
             active_nodes_str = ",".join(map(str, active_nodes))
-            active_ids_str = ",".join(map(str, active_edges))
+            all_built_edges = active_edges.union(acc_edges)
+            active_ids_str = ",".join(map(str, all_built_edges))
             
             # Query candidates adjacent ONLY to the active endpoints of our single continuous path
             cur.execute(f"""
