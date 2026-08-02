@@ -371,14 +371,14 @@ class RecommendationEngine:
             comp_flow = sum(edge_flows.get(eid, 0.0) for eid in comp)
             component_stats.append((comp, comp_flow, len(comp)))
 
-        # Sort components by total baseline flow descending
-        component_stats.sort(key=lambda x: x[1], reverse=True)
+        # Sort components by cluster size (number of edges) descending
+        component_stats.sort(key=lambda x: x[2], reverse=True)
 
         if offset == 0:
             console.print(f"Detected [bold]{len(components)}[/] disconnected cycleway clusters in reference scenario.")
-            console.print("[bold cyan]Top 5 cycleway clusters sorted by baseline flow:[/]")
+            console.print("[bold cyan]Top 5 cycleway clusters sorted by cluster size (number of edges):[/]")
             for idx, (comp, flow, size) in enumerate(component_stats[:5]):
-                console.print(f"  - Cluster {idx+1}: {size} edges, Total Flow: {round(flow, 1)} active trips/day (Example Edge ID: {comp[0]})")
+                console.print(f"  - Cluster {idx+1}: {size} edges (Example Edge ID: {comp[0]})")
 
         # Automatically select the highest flow component as the seed X_seed
         selected_component = component_stats[0][0]
