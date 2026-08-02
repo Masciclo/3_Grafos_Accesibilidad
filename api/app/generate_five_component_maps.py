@@ -48,14 +48,16 @@ def main():
         5: "Cluster 5: Sector Pudahuel-Maipú Subnetwork (276 edges)",
     }
 
-    output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data", "santiago", "out", "maps"))
+    output_dir = "/app/data/santiago/out/maps"
+    if not os.path.exists("/app"):
+        output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data", "santiago", "out", "maps"))
     os.makedirs(output_dir, exist_ok=True)
     generator = AcademicMapGenerator(output_dir=output_dir)
 
     bbox = net_gdf.total_bounds
     xmin, ymin, xmax, ymax = bbox
-    srid = net_gdf.crs.to_epsg() if net_gdf.crs else 32719
-    green, water, build, limit = generator._ensure_context_layers("santiago", [xmin, ymin, xmax, ymax], srid)
+    # Skip slow Overpass API background downloads for instant rendering
+    green, water, build, limit = None, None, None, None
 
     # -------------------------------------------------------------
     # MAP 1: CURRENT SCENARIO (DISCONNECTED BASELINE)
