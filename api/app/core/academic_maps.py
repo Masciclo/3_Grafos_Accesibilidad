@@ -605,6 +605,7 @@ class AcademicMapGenerator:
         fig = go.Figure()
         bg_color = self._add_osm_background(fig, context_gdf if context_gdf is not None else delta_gdf, green, water, build, limit, city_name=city_key, show_cycleways=False)
         if not fg_gdf.empty:
+            max_abs = fg_gdf['delta_flow'].abs().max()
             neg = fg_gdf[fg_gdf['delta_flow'] < 0]['delta_flow']
             pos = fg_gdf[fg_gdf['delta_flow'] > 0]['delta_flow']
             neg_abs = neg.abs()
