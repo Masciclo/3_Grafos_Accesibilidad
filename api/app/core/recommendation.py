@@ -252,7 +252,7 @@ class RecommendationEngine:
                             FROM {net_table}
                             WHERE highway != 'cycleway'
                               AND highway NOT IN ('motorway', 'trunk')
-                              AND ST_DWithin(ST_Transform(geometry, 32718), ST_Transform(ST_SetSRID(ST_Point(%s, %s), 4326), 32718), 500)
+                              AND ST_DWithin(ST_Transform(geometry, {self.srid}), ST_Transform(ST_SetSRID(ST_Point(%s, %s), 4326), {self.srid}), 500)
                             ORDER BY COALESCE(od_flow, 0) DESC
                             LIMIT 1;
                         """, (centroid.x, centroid.y))
@@ -265,7 +265,7 @@ class RecommendationEngine:
                                 FROM {net_table}
                                 WHERE highway != 'cycleway'
                                   AND highway NOT IN ('motorway', 'trunk')
-                                  AND ST_DWithin(ST_Transform(geometry, 32718), ST_Transform(ST_SetSRID(ST_Point(%s, %s), 4326), 32718), 1500)
+                                  AND ST_DWithin(ST_Transform(geometry, {self.srid}), ST_Transform(ST_SetSRID(ST_Point(%s, %s), 4326), {self.srid}), 1500)
                                 ORDER BY COALESCE(od_flow, 0) DESC
                                 LIMIT 1;
                             """, (centroid.x, centroid.y))
@@ -393,7 +393,7 @@ class RecommendationEngine:
               AND EXISTS (
                   SELECT 1 FROM {net_table} c
                   WHERE c.id IN ({selected_edge_ids_str})
-                    AND ST_DWithin(ST_Transform(s.geometry, 32718), ST_Transform(c.geometry, 32718), 500)
+                    AND ST_DWithin(ST_Transform(s.geometry, {self.srid}), ST_Transform(c.geometry, {self.srid}), 500)
               )
             ORDER BY COALESCE(s.od_flow, 0) DESC
             LIMIT 1 OFFSET %s;

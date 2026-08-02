@@ -69,11 +69,13 @@ class TestUrbanOntology(unittest.TestCase):
         self.assertEqual(recipe.reproject_files[0], "Zonas_EOD.shp")
         print("✅ test_ingestion_ontology_schemas PASSED!")
 
-    def test_cumulative_greedy_growth_signature(self):
+    def test_cumulative_greedy_growth(self):
         from core.recommendation import RecommendationEngine
         import inspect
         sig = inspect.signature(RecommendationEngine._solve_greedy_growth)
         self.assertIn("accumulated_upgrades", sig.parameters)
+        param = sig.parameters["accumulated_upgrades"]
+        self.assertEqual(param.default, None)
         print("✅ test_cumulative_greedy_growth_signature PASSED!")
 
 if __name__ == "__main__":
