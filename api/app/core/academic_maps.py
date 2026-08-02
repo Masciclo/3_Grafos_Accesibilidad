@@ -605,22 +605,22 @@ class AcademicMapGenerator:
         fig = go.Figure()
         bg_color = self._add_osm_background(fig, context_gdf if context_gdf is not None else delta_gdf, green, water, build, limit, city_name=city_key, show_cycleways=False)
         if not fg_gdf.empty:
-            max_abs = fg_gdf['delta_flow'].abs().max()
             neg = fg_gdf[fg_gdf['delta_flow'] < 0]['delta_flow']
             pos = fg_gdf[fg_gdf['delta_flow'] > 0]['delta_flow']
-            q_neg = np.quantile(neg, [0, 0.50, 0.875, 0.975, 1.0]) if not neg.empty else [-1, -1, -1, -1, -1]
-            q_pos = np.quantile(pos, [0, 0.50, 0.875, 0.975, 1.0]) if not pos.empty else [1, 1, 1, 1, 1]
+            neg_abs = neg.abs()
+            q_neg_abs = np.quantile(neg_abs, [0, 0.50, 0.875, 0.975, 1.0]) if not neg.empty else [0, 1, 2, 3, 4]
+            q_pos = np.quantile(pos, [0, 0.50, 0.875, 0.975, 1.0]) if not pos.empty else [0, 1, 2, 3, 4]
             colors = ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#e0e0e0", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac"]
             labels = [
-                "Critical Reduction (Top 2.5%)", "Major Reduction (87.5-97.5%)", "Medium Reduction (50-87.5%)", "Light Reduction (0-50%)",
+                "Critical Reduction (Top 2.5% Drop)", "Major Reduction (87.5-97.5% Drop)", "Medium Reduction (50-87.5% Drop)", "Light Reduction (0-50% Drop)",
                 "No Change",
-                "Light Increase (0-50%)", "Medium Increase (50-87.5%)", "Major Increase (87.5-97.5%)", "Critical Peak Increase (Top 2.5%)"
+                "Light Increase (0-50% Gain)", "Medium Increase (50-87.5% Gain)", "Major Increase (87.5-97.5% Gain)", "Critical Peak Increase (Top 2.5% Gain)"
             ]
             for i in range(9):
-                if i == 0: cond = (fg_gdf['delta_flow'] < q_neg[3])
-                elif i == 1: cond = (fg_gdf['delta_flow'] >= q_neg[3]) & (fg_gdf['delta_flow'] < q_neg[2])
-                elif i == 2: cond = (fg_gdf['delta_flow'] >= q_neg[2]) & (fg_gdf['delta_flow'] < q_neg[1])
-                elif i == 3: cond = (fg_gdf['delta_flow'] >= q_neg[1]) & (fg_gdf['delta_flow'] < 0)
+                if i == 0: cond = (fg_gdf['delta_flow'] < -q_neg_abs[3])
+                elif i == 1: cond = (fg_gdf['delta_flow'] >= -q_neg_abs[3]) & (fg_gdf['delta_flow'] < -q_neg_abs[2])
+                elif i == 2: cond = (fg_gdf['delta_flow'] >= -q_neg_abs[2]) & (fg_gdf['delta_flow'] < -q_neg_abs[1])
+                elif i == 3: cond = (fg_gdf['delta_flow'] >= -q_neg_abs[1]) & (fg_gdf['delta_flow'] < 0)
                 elif i == 4: cond = (fg_gdf['delta_flow'] == 0)
                 elif i == 5: cond = (fg_gdf['delta_flow'] > 0) & (fg_gdf['delta_flow'] <= q_pos[1])
                 elif i == 6: cond = (fg_gdf['delta_flow'] > q_pos[1]) & (fg_gdf['delta_flow'] <= q_pos[2])
