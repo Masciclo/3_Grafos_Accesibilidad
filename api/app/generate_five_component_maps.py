@@ -106,45 +106,61 @@ def main():
     print(f"   ✅ Saved Map 1: {path1}")
 
     # -------------------------------------------------------------
-    # MAP 2: POST SCENARIO (RECALCULATED CONNECTED COMPONENTS)
+    # MAP 2: POST SCENARIO (INTERVENED METROPOLITAN NETWORK + PROJECTS IN MAGENTA)
     # -------------------------------------------------------------
-    print("   - [Map 2/2] Rendering Recalculated Connected Components (Post Scenario)...")
+    print("   - [Map 2/2] Rendering Intervened Connected Scenario (Post Scenario)...")
     fig2 = go.Figure()
     bg_color2 = generator._add_osm_background(fig2, rec_gdf, green, water, build, limit, city_name="santiago", show_cycleways=False)
 
-    # 1. Build Post-Recommendation Graph G_post (including projects) to recalculate macro components
-    post_net_gdf = gpd.read_postgis("SELECT id, source, target, highway, geometry FROM santchil_rec_1785604682_internal_net", engine, geom_col='geometry')
-    proj_edge_ids = set(rec_gdf[rec_gdf['is_project'] == True]['edge_id'])
+    # 1. Render neutral background for other secondary cycleways (Clusters 6 to 348)
+    if not other_cycles.empty:
+        fig2.add_trace(go.Scatter(
+            x=xo, y=yo, mode='lines', name='Other Secondary Unconnected Cycleways',
+            line=dict(color='#CFD8DC', width=1.0), connectgaps=False, hoverinfo='skip', showlegend=True
+        ))
 
-    G_post = nx.Graph()
-    for _, r in post_net_gdf.iterrows():
-        if r['highway'] == 'cycleway' or r['id'] in proj_edge_ids:
-            G_post.add_edge(r['source'], r['target'], id=r['id'])
+    # 2. Render Unconnected Component 2 (Sector Conchalí) in Purple (#763DF2)
+    c2_edges = cycle_gdf[cycle_gdf['id'].isin([eid for eid, cid in edge_to_cluster.items() if cid == 2])]
+    if not c2_edges.empty:
+        xc2, yc2, hover2 = [], [], []
+        for _, r in c2_edges.iterrows():
+            h_text = f"<b>Unconnected Subnetwork (Cluster 2: Sector Conchalí)</b><br>Edge ID: {r['id']}"
+            lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
+            for l in lines:
+                xs, ys = l.xy
+                xc2.extend(list(xs) + [None])
+                yc2.extend(list(ys) + [None])
+                hover2.extend([h_text] * (len(xs) + 1))
 
-    comps_post = sorted(nx.connected_components(G_post), key=len, reverse=True)
-    mega_comp_1 = comps_post[0]  # The newly merged Mega-Cluster 1!
+        fig2.add_trace(go.Scatter(
+            x=xc2, y=yc2, mode='lines',
+            name="Unconnected Subnetwork (Cluster 2: Sector Conchalí - 392 edges)",
+            line=dict(color=palette[2], width=2.8), connectgaps=False, hoverinfo='text', text=hover2
+        ))
 
-    # 2. Categorize pre-existing cycleways into Merged Mega-Cluster 1 vs Unconnected Clusters
-    merged_edges = []
-    unconnected_clusters = {1: [], 2: [], 3: [], 4: [], 5: [], 'other': []}
+    # 3. Render Intervened Metropolitan System (Clusters 1, 3, 4, 5 + 10 Projects) in Magenta (#F20574)
+    intervened_cluster_ids = [1, 3, 4, 5]
+    intervened_cycles = cycle_gdf[cycle_gdf['id'].isin([eid for eid, cid in edge_to_cluster.items() if cid in intervened_cluster_ids])]
+    proj_gdf = rec_gdf[rec_gdf['is_project'] == True].copy()
 
-    for _, r in cycle_gdf.iterrows():
-        e_id = r['id']
-        src, tgt = r['source'], r['target']
-        
-        # If either endpoint is in the new Mega-Cluster 1, it has been merged!
-        if src in mega_comp_1 or tgt in mega_comp_1:
-            merged_edges.append(r)
-        else:
-            cid = edge_to_cluster.get(e_id, 'other')
-            unconnected_clusters[cid].append(r)
+    xm, ym, hover_m = [], [], []
 
-    # 3. Render Merged Mega-Cluster 1 (Color 1: #F20574)
-    if merged_edges:
-        merged_gdf = gpd.GeoDataFrame(merged_edges, crs=cycle_gdf.crs)
-        xm, ym, hover_m = [], [], []
-        for _, r in merged_gdf.iterrows():
-            h_text = f"<b>Merged Metropolitan Component 1</b><br>Edge ID: {r['id']}"
+    # Add pre-existing cycleways of Clusters 1, 3, 4, 5
+    for _, r in intervened_cycles.iterrows():
+        h_text = f"<b>Intervened Metropolitan System (Magenta)</b><br>Edge ID: {r['id']}"
+        lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
+        for l in lines:
+            xs, ys = l.xy
+            xm.extend(list(xs) + [None])
+            ym.extend(list(ys) + [None])
+            hover_m.extend([h_text] * (len(xs) + 1))
+
+    # Add the 10 new bikelane project corridors as part of the unified Magenta network
+    if not proj_gdf.empty:
+        for _, r in proj_gdf.iterrows():
+            p_id = r.get('project_id', 'Project Corridor')
+            flow_v = int(r.get('od_flow', 0) or 0)
+            h_text = f"<b>Intervened Project Corridor: {p_id}</b><br>Flow: {flow_v} trips/day"
             lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
             for l in lines:
                 xs, ys = l.xy
@@ -152,50 +168,13 @@ def main():
                 ym.extend(list(ys) + [None])
                 hover_m.extend([h_text] * (len(xs) + 1))
 
-        fig2.add_trace(go.Scatter(
-            x=xm, y=ym, mode='lines',
-            name="Merged Metropolitan Network (Cluster 1 + Stitched Subnetworks 3, 4, 5)",
-            line=dict(color=palette[1], width=2.8), connectgaps=False, hoverinfo='text', text=hover_m
-        ))
+    fig2.add_trace(go.Scatter(
+        x=xm, y=ym, mode='lines',
+        name="Intervened Metropolitan Network (Clusters 1, 3, 4, 5 + 10 Projects)",
+        line=dict(color=palette[1], width=3.0), connectgaps=False, hoverinfo='text', text=hover_m
+    ))
 
-    # 4. Render Unconnected Clusters using their original baseline colors
-    for c_id in range(2, 6):
-        c_list = unconnected_clusters.get(c_id, [])
-        if not c_list: continue
-        c_gdf = gpd.GeoDataFrame(c_list, crs=cycle_gdf.crs)
-        xc, yc, hover = [], [], []
-        for _, r in c_gdf.iterrows():
-            h_text = f"<b>Unconnected Component: {cluster_names[c_id]}</b><br>Edge ID: {r['id']}"
-            lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
-            for l in lines:
-                xs, ys = l.xy
-                xc.extend(list(xs) + [None])
-                yc.extend(list(ys) + [None])
-                hover.extend([h_text] * (len(xs) + 1))
-
-        fig2.add_trace(go.Scatter(
-            x=xc, y=yc, mode='lines', name=f"Unconnected Component ({cluster_names[c_id].split(':')[0]})",
-            line=dict(color=palette[c_id], width=2.8), connectgaps=False, hoverinfo='text', text=hover
-        ))
-
-    # 5. Render neutral background for other secondary cycleways that remained unconnected
-    other_list = unconnected_clusters.get('other', [])
-    if other_list:
-        o_gdf = gpd.GeoDataFrame(other_list, crs=cycle_gdf.crs)
-        xo2, yo2 = [], []
-        for _, r in o_gdf.iterrows():
-            lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
-            for l in lines:
-                xs, ys = l.xy
-                xo2.extend(list(xs) + [None])
-                yo2.extend(list(ys) + [None])
-
-        fig2.add_trace(go.Scatter(
-            x=xo2, y=yo2, mode='lines', name='Other Unconnected Cycleways',
-            line=dict(color='#CFD8DC', width=1.0), connectgaps=False, hoverinfo='skip', showlegend=True
-        ))
-
-    generator._apply_academic_layout(fig2, "Santiago Recalculated Connected Components", x_range=[xmin, xmax], y_range=[ymin, ymax], bg_color=bg_color2)
+    generator._apply_academic_layout(fig2, "Santiago Intervened Connected Metropolitan Scenario", x_range=[xmin, xmax], y_range=[ymin, ymax], bg_color=bg_color2)
     path2 = os.path.join(output_dir, "santiago_5_components_post_connected.html")
     generator._write_centered_html(fig2, path2)
     print(f"   ✅ Saved Map 2: {path2}")
