@@ -608,18 +608,24 @@ class AcademicMapGenerator:
             max_abs = fg_gdf['delta_flow'].abs().max()
             neg = fg_gdf[fg_gdf['delta_flow'] < 0]['delta_flow']
             pos = fg_gdf[fg_gdf['delta_flow'] > 0]['delta_flow']
-            q_neg = np.quantile(neg, [0, 0.33, 0.66, 1.0]) if not neg.empty else [-1, -1, -1, -1]
-            q_pos = np.quantile(pos, [0, 0.33, 0.66, 1.0]) if not pos.empty else [1, 1, 1, 1]
-            colors = ["#d73027", "#f46d43", "#fdae61", "#e0e0e0", "#abd9e9", "#74add1", "#4575b4"]
-            labels = ["Critical Reduction", "Medium Reduction", "Light Reduction", "No Change", "Light Increase", "Medium Increase", "Critical Increase"]
-            for i in range(7):
-                if i == 0: cond = (fg_gdf['delta_flow'] < q_neg[1])
-                elif i == 1: cond = (fg_gdf['delta_flow'] >= q_neg[1]) & (fg_gdf['delta_flow'] < q_neg[2])
-                elif i == 2: cond = (fg_gdf['delta_flow'] >= q_neg[2]) & (fg_gdf['delta_flow'] < 0)
-                elif i == 3: cond = (fg_gdf['delta_flow'] == 0)
-                elif i == 4: cond = (fg_gdf['delta_flow'] > 0) & (fg_gdf['delta_flow'] <= q_pos[1])
-                elif i == 5: cond = (fg_gdf['delta_flow'] > q_pos[1]) & (fg_gdf['delta_flow'] <= q_pos[2])
-                else: cond = (fg_gdf['delta_flow'] > q_pos[2])
+            q_neg = np.quantile(neg, [0, 0.50, 0.875, 0.975, 1.0]) if not neg.empty else [-1, -1, -1, -1, -1]
+            q_pos = np.quantile(pos, [0, 0.50, 0.875, 0.975, 1.0]) if not pos.empty else [1, 1, 1, 1, 1]
+            colors = ["#b2182b", "#d6604d", "#f4a582", "#fddbc7", "#e0e0e0", "#d1e5f0", "#92c5de", "#4393c3", "#2166ac"]
+            labels = [
+                "Critical Reduction (Top 2.5%)", "Major Reduction (87.5-97.5%)", "Medium Reduction (50-87.5%)", "Light Reduction (0-50%)",
+                "No Change",
+                "Light Increase (0-50%)", "Medium Increase (50-87.5%)", "Major Increase (87.5-97.5%)", "Critical Peak Increase (Top 2.5%)"
+            ]
+            for i in range(9):
+                if i == 0: cond = (fg_gdf['delta_flow'] < q_neg[3])
+                elif i == 1: cond = (fg_gdf['delta_flow'] >= q_neg[3]) & (fg_gdf['delta_flow'] < q_neg[2])
+                elif i == 2: cond = (fg_gdf['delta_flow'] >= q_neg[2]) & (fg_gdf['delta_flow'] < q_neg[1])
+                elif i == 3: cond = (fg_gdf['delta_flow'] >= q_neg[1]) & (fg_gdf['delta_flow'] < 0)
+                elif i == 4: cond = (fg_gdf['delta_flow'] == 0)
+                elif i == 5: cond = (fg_gdf['delta_flow'] > 0) & (fg_gdf['delta_flow'] <= q_pos[1])
+                elif i == 6: cond = (fg_gdf['delta_flow'] > q_pos[1]) & (fg_gdf['delta_flow'] <= q_pos[2])
+                elif i == 7: cond = (fg_gdf['delta_flow'] > q_pos[2]) & (fg_gdf['delta_flow'] <= q_pos[3])
+                else: cond = (fg_gdf['delta_flow'] > q_pos[3])
                 subset = fg_gdf[cond]
                 if subset.empty: continue
                 v_min, v_max = subset['delta_flow'].min(), subset['delta_flow'].max()
