@@ -106,12 +106,32 @@ class TelemetryManager:
             diagnostic_handler.report("MODEL_ERROR", "WARNING", f"Model training failed: {e}")
             return False
 
+    def _get_scale_defaults(self, osm_input_path, od_input_path):
+        """Calculates scale-aware baseline defaults based on OD matrix rows and location hints."""
+        od_rows = 0
+        if od_input_path and os.path.exists(od_input_path):
+            try:
+                with open(od_input_path, 'rb') as f:
+                    od_rows = sum(1 for _ in f) - 1
+            except Exception:
+                pass
+
+        str_hint = str(osm_input_path).lower() + " " + str(od_input_path).lower()
+        is_metro = od_rows > 1000000 or 'santiago' in str_hint or 'sant' in str_hint
+        is_medium = od_rows > 100000 or 'valparaiso' in str_hint or 'concepcion' in str_hint
+
+        if is_metro:
+            return {'total': 21600, 'ingestion': 300, 'topo': 450, 'grid': 480, 'refactor': 900, 'routing': 19200, 'agg': 180, 'final': 2400}
+        elif is_medium:
+            return {'total': 3600, 'ingestion': 60, 'topo': 90, 'grid': 60, 'refactor': 300, 'routing': 2700, 'agg': 120, 'final': 300}
+        else:
+            return {'total': 300, 'ingestion': 10, 'topo': 15, 'grid': 10, 'refactor': 40, 'routing': 180, 'agg': 30, 'final': 60}
+
     def predict_eta(self, osm_input_path, od_input_path, has_projects, stage='total'):
         """
         Predicts duration for a specific stage or the total pipeline.
         """
-        # Intelligent Defaults (Baseline for new machines)
-        defaults = {'total': 300, 'ingestion': 10, 'topo': 15, 'grid': 10, 'refactor': 40, 'routing': 120, 'agg': 30, 'final': 10}
+        defaults = self._get_scale_defaults(osm_input_path, od_input_path)
         
         if not self.is_trained:
             self.train_model()
@@ -137,7 +157,12 @@ class TelemetryManager:
     def format_eta(self, seconds):
         if seconds < 60:
             return f"~{int(seconds)}s"
-        return f"~{int(seconds // 60)}m"
+        elif seconds < 3600:
+            return f"~{int(seconds // 60)}m"
+        else:
+            hours = int(seconds // 3600)
+            mins = int((seconds % 3600) // 60)
+            return f"~{hours}h {mins}m"
 
 # Static instance
 telemetry_manager = TelemetryManager()

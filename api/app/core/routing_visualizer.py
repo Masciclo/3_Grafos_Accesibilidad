@@ -223,12 +223,16 @@ class RoutingVisualizer:
                 
             # Generate active scenario flow maps: full network flow & bikelane flow for all scenarios
             net_flow_plot = reporter.generate_map(net_gdf, MapType.FLOW, master_bbox, scenario_prefix, total_trips)
+            if observer: observer.on_progress_update(None, "ADVANCE_MAPPING", increment=1)
+
             bikelane_flow_plot = reporter.generate_map(net_gdf, MapType.FLOW_BIKELANES, master_bbox, scenario_prefix, total_trips)
+            if observer: observer.on_progress_update(None, "ADVANCE_MAPPING", increment=1)
             
             # Generate Project Performance Map if projects or recommendations are present
             has_projects = bool(config.projects_input or config.scenario_id.startswith("rec_") or ('is_project' in net_gdf.columns and net_gdf['is_project'].any()))
             if has_projects:
                 reporter.generate_map(net_gdf, MapType.PROJECT_PERFORMANCE, master_bbox, scenario_prefix, total_trips)
+                if observer: observer.on_progress_update(None, "ADVANCE_MAPPING", increment=1)
             
             plots = []
             

@@ -30,11 +30,11 @@ class PipelineUI:
             {"id": 2, "name": "Topology Creation", "steps": 2},
             {"id": 3, "name": "Grid Extraction", "steps": 100}, # Percentage-based
             {"id": 4, "name": "H3 Snapping", "steps": 1, "optional": True},
-            {"id": 5, "name": "Refactorización de la Topología", "steps": 6},
+            {"id": 5, "name": "Topology Refactoring", "steps": 6},
             {"id": 6, "name": "Intermodal Merging", "steps": 1, "optional": True},
             {"id": 7, "name": "Demand Routing", "steps": 100}, # Origins-based
             {"id": 8, "name": "H3 Aggregation", "steps": 6},
-            {"id": 9, "name": "Cierre Analítico y Auditoría", "steps": 2}
+            {"id": 9, "name": "Analytical Closing & Audit", "steps": 2}
         ]
         
         self.phases = [p for p in all_phases if not p.get("optional") or is_comparison]
@@ -50,13 +50,13 @@ class PipelineUI:
         
         # Initialize Task IDs for each phase
         for p in self.phases:
-            p["task_id"] = self.progress.add_task(p["name"], total=p["steps"], visible=False)
+            p["task_id"] = self.progress.add_task("", total=p["steps"], visible=False)
             p["status"] = "PENDING"
             p["start"] = None
             p["end"] = None
             p["eta"] = "Auto"
-
-        self.overall_task = self.progress.add_task("[bold yellow]OVERALL SIMULATION", total=len(self.phases))
+ 
+        self.overall_task = self.progress.add_task("[bold white]Overall Simulation", total=len(self.phases))
 
     def update_phase(self, phase_id, status="RUNNING", increment=0, total=None):
         now = time.time()
@@ -87,8 +87,8 @@ class PipelineUI:
         return f"{int(seconds // 60)}m {int(seconds % 60)}s"
 
     def make_config_table(self):
-        table = Table(title="[bold cyan]Pipeline Configuration", border_style="cyan", box=None)
-        table.add_column("Parameter", style="bold blue")
+        table = Table(title="[bold white]Pipeline Configuration", border_style="white", box=None)
+        table.add_column("Parameter", style="bold white")
         table.add_column("Value", style="white")
         if self.args:
             table.add_row("Location", self.location)
@@ -114,24 +114,24 @@ class PipelineUI:
             Align.center(frame, vertical="middle")
         )
         
-        display_text = prompt_text if prompt_text else "[bold green]esperando consulta...[/]"
-        layout["prompt"].update(Panel(display_text, border_style="green", padding=(0, 2)))
+        display_text = prompt_text if prompt_text else "[bold green]waiting for query...[/]"
+        layout["prompt"].update(Panel(display_text, border_style="white", padding=(0, 2)))
         return layout
 
     def get_audit_layout(self, census_map, od_map, spatial_status="VALID"):
         # Meta Table
         meta_table = Table(box=None, expand=True)
-        meta_table.add_column("Dataset", style="bold cyan")
-        meta_table.add_column("Attribute", style="blue")
-        meta_table.add_column("Mapped Column", style="green")
+        meta_table.add_column("Dataset", style="bold white")
+        meta_table.add_column("Attribute", style="white")
+        meta_table.add_column("Mapped Column", style="white")
         for k, v in census_map.items(): meta_table.add_row("Census", k, v)
         for k, v in od_map.items(): meta_table.add_row("Demand", k, v)
         
         # Phase Budget Table
         budget_table = Table(box=None, expand=True)
         budget_table.add_column("#", style="dim")
-        budget_table.add_column("Planned Stage", style="bold")
-        budget_table.add_column("Predicted ETA", style="yellow")
+        budget_table.add_column("Planned Stage", style="bold white")
+        budget_table.add_column("Predicted ETA", style="dim")
         for p in self.phases:
             budget_table.add_row(str(p["id"]), p["name"], p["eta"])
 
@@ -142,12 +142,12 @@ class PipelineUI:
         controls = "[bold green][C] Launch Analysis[/] | [bold yellow][R] Redefine Parameters[/] | [bold red][Ctrl+C] Abort[/]"
         
         return Group(
-            Panel(f"[bold blue]SCREEN 2: Pre-flight Audit Monitoring[/] [dim]Area: {self.location} | Scenario: {getattr(self.args, 'scenario_id', 'v1')}[/]", border_style="blue"),
+            Panel(f"[bold white]SCREEN 2: Pre-flight Audit Monitoring[/] [dim]Area: {self.location} | Scenario: {getattr(self.args, 'scenario_id', 'v1')}[/]", border_style="white"),
             Group(
-                Panel(meta_table, title="[bold]Metadata Standardization", border_style="green"),
-                Panel(budget_table, title="[bold]Estimated Phase Budget", border_style="yellow")
+                Panel(meta_table, title="[bold white]Metadata Standardization", border_style="white"),
+                Panel(budget_table, title="[bold white]Estimated Phase Budget", border_style="white")
             ),
-            Panel(guard_msg, title="[bold]Safety Guard", border_style=guard_style),
+            Panel(guard_msg, title="[bold white]Safety Guard", border_style=guard_style),
             Panel(Align.center(controls), border_style="dim")
         )
 
@@ -161,7 +161,7 @@ class PipelineUI:
             Layout(name="footer", size=1)
         )
         # Compact Header
-        header_text = Text.from_markup(f" [bold white on blue] +CICLO [/] [bold blue] Mission Control: {self.location} [/] [dim]|[/] [cyan] Scenario: {self.args.scenario_id} [/]")
+        header_text = Text.from_markup(f" [bold black on white] +CICLO [/] [bold white] Mission Control: {self.location} [/] [dim]|[/] [white] Scenario: {self.args.scenario_id} [/]")
         layout["header"].update(header_text)
         
         # --- Body: Unified Engineering Panel ---
@@ -175,7 +175,15 @@ class PipelineUI:
         status_table.add_column("Progress", width=30)
         status_table.add_column("Status", justify="center")
         status_table.add_column("Elapsed", justify="right", style="dim")
-        status_table.add_column("ETA", style="cyan")
+        status_table.add_column("ETA", style="dim")
+
+        # Ensure all phases are marked DONE if pipeline completed
+        if self.completed:
+            for p in self.phases:
+                p["status"] = "DONE ✅"
+                task = self.progress._tasks[p["task_id"]]
+                self.progress.update(p["task_id"], completed=task.total)
+            self.progress.update(self.overall_task, completed=len(self.phases))
 
         for p in self.phases:
             # DYNAMIC TIMER LOGIC
@@ -186,7 +194,7 @@ class PipelineUI:
                 elapsed_val = p["end"] - p["start"]
             
             elapsed_str = self.format_time(elapsed_val) if elapsed_val else "--"
-            status_style = "green" if "DONE" in p["status"] else "bold yellow" if "RUNNING" in p["status"] else "dim"
+            status_style = "bold green" if "DONE" in p["status"] else "bold cyan" if "RUNNING" in p["status"] else "dim"
             
             # Inline Progress Bar
             task = self.progress._tasks[p["task_id"]]
@@ -203,11 +211,11 @@ class PipelineUI:
 
         layout["body"].update(Panel(
             Group(
-                Panel(overall_table, border_style="yellow", title="[bold]Overall Mission Status"),
+                Panel(overall_table, border_style="white", title="[bold white]Overall Mission Status"),
                 status_table
             ), 
-            title="[bold blue]Analytical Pipeline", 
-            border_style="blue"
+            title="[bold white]Analytical Pipeline", 
+            border_style="white"
         ))
 
         # Telemetry-Rich Metrics
@@ -219,13 +227,13 @@ class PipelineUI:
             f" [dim]Machine:[/] [bold]{getattr(self.args, 'machine_hash', 'unknown')[:8]}[/]", 
             f" [dim]Model:[/] [bold]Log-Log[/]"
         )
-        layout["telemetry"].update(Panel(metrics, title="[bold yellow]System Metrics", border_style="yellow"))
+        layout["telemetry"].update(Panel(metrics, title="[bold white]System Metrics", border_style="white"))
 
         diag_list = []
         for d in diagnostic_handler.diagnostics[-3:]:
             diag_list.append(Text.from_markup(f" {d['emoji']} [dim]{d['level']}:[/] {d['message']}"))
         if not diag_list: diag_list = [Text(" Monitoring live telemetry...", style="dim")]
-        layout["diagnostics"].update(Panel(Group(*diag_list), title="[bold dim]Diagnostic Feed", border_style="dim"))
+        layout["diagnostics"].update(Panel(Group(*diag_list), title="[bold dim]Diagnostic Feed", border_style="white"))
         
         footer_msg = Text.from_markup(f" [bold green]✓ Pipeline Completed Successfully! 🎉[/]" if self.completed else " [italic dim]Processing architectural hooks...[/]")
         layout["footer"].update(footer_msg)
