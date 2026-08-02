@@ -119,12 +119,12 @@ def main():
             line=dict(color='#CFD8DC', width=1.0), connectgaps=False, hoverinfo='skip', showlegend=True
         ))
 
-    # 2. Render Unconnected Component 2 (Sector Conchalí) in Purple (#763DF2)
+    # 2. Render Component 2 (Sector Conchalí) in original Purple (#763DF2)
     c2_edges = cycle_gdf[cycle_gdf['id'].isin([eid for eid, cid in edge_to_cluster.items() if cid == 2])]
     if not c2_edges.empty:
         xc2, yc2, hover2 = [], [], []
         for _, r in c2_edges.iterrows():
-            h_text = f"<b>Unconnected Subnetwork (Cluster 2: Sector Conchalí)</b><br>Edge ID: {r['id']}"
+            h_text = f"<b>Subnetwork (Cluster 2: Sector Conchalí)</b><br>Edge ID: {r['id']}"
             lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
             for l in lines:
                 xs, ys = l.xy
@@ -134,18 +134,37 @@ def main():
 
         fig2.add_trace(go.Scatter(
             x=xc2, y=yc2, mode='lines',
-            name="Unconnected Subnetwork (Cluster 2: Sector Conchalí - 392 edges)",
+            name="Cluster 2: Sector Conchalí (392 edges)",
             line=dict(color=palette[2], width=2.8), connectgaps=False, hoverinfo='text', text=hover2
         ))
 
-    # 3. Render Intervened Metropolitan System (Clusters 1, 3, 4, 5 + 10 Projects) in Magenta (#F20574)
-    intervened_cluster_ids = [1, 3, 4, 5]
+    # 3. Render Component 3 (Sector Peñalolén) in original Blue (#3D8BF2)
+    c3_edges = cycle_gdf[cycle_gdf['id'].isin([eid for eid, cid in edge_to_cluster.items() if cid == 3])]
+    if not c3_edges.empty:
+        xc3, yc3, hover3 = [], [], []
+        for _, r in c3_edges.iterrows():
+            h_text = f"<b>Subnetwork (Cluster 3: Sector Peñalolén)</b><br>Edge ID: {r['id']}"
+            lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
+            for l in lines:
+                xs, ys = l.xy
+                xc3.extend(list(xs) + [None])
+                yc3.extend(list(ys) + [None])
+                hover3.extend([h_text] * (len(xs) + 1))
+
+        fig2.add_trace(go.Scatter(
+            x=xc3, y=yc3, mode='lines',
+            name="Cluster 3: Sector Peñalolén (309 edges)",
+            line=dict(color=palette[3], width=2.8), connectgaps=False, hoverinfo='text', text=hover3
+        ))
+
+    # 4. Render Intervened Metropolitan System (Clusters 1, 4, 5 + 10 Projects) in Magenta (#F20574)
+    intervened_cluster_ids = [1, 4, 5]
     intervened_cycles = cycle_gdf[cycle_gdf['id'].isin([eid for eid, cid in edge_to_cluster.items() if cid in intervened_cluster_ids])]
     proj_gdf = rec_gdf[rec_gdf['is_project'] == True].copy()
 
     xm, ym, hover_m = [], [], []
 
-    # Add pre-existing cycleways of Clusters 1, 3, 4, 5
+    # Add pre-existing cycleways of Clusters 1, 4, 5
     for _, r in intervened_cycles.iterrows():
         h_text = f"<b>Intervened Metropolitan System (Magenta)</b><br>Edge ID: {r['id']}"
         lines = [r.geometry] if r.geometry.geom_type == 'LineString' else list(r.geometry.geoms)
@@ -170,7 +189,7 @@ def main():
 
     fig2.add_trace(go.Scatter(
         x=xm, y=ym, mode='lines',
-        name="Intervened Metropolitan Network (Clusters 1, 3, 4, 5 + 10 Projects)",
+        name="Intervened Metropolitan Network (Clusters 1, 4, 5 + 10 Projects)",
         line=dict(color=palette[1], width=3.0), connectgaps=False, hoverinfo='text', text=hover_m
     ))
 
