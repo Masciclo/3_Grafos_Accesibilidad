@@ -68,42 +68,42 @@ class DataProvider:
         
         if not folders_exist:
             console.print(Panel(
-                f"[bold yellow]WIZARD DE INGESTIÓN DE CIUDAD[/]\n"
-                f"La clave '[bold cyan]{city_key}[/]' no está registrada en city_registry.csv.\n\n"
-                f"Crearemos la estructura de directorios requerida para este proyecto.",
+                f"[bold yellow]CITY INGESTION WIZARD[/]\n"
+                f"Key '[bold cyan]{city_key}[/]' is not registered in city_registry.csv.\n\n"
+                f"We will create the required directory structure for this project.",
                 border_style="yellow"
             ))
             confirm = Prompt.ask(
-                f"[bold yellow]¿Deseas crear las carpetas en data/{city_key}/ ahora? (S/N)[/]",
-                choices=["S", "N", "s", "n"],
-                default="S"
+                f"[bold yellow]Would you like to create the folders under data/{city_key}/ now? (Y/N)[/]",
+                choices=["Y", "N", "y", "n"],
+                default="Y"
             ).upper()
             if confirm == "N":
                 return None
                 
             self.initialize_location_structure(city_key)
             console.print(Panel(
-                f"[bold green]✓ ¡Estructura de directorios creada correctamente![/]\n\n"
-                f"Por favor, coloca tus archivos dentro de las siguientes carpetas:\n"
-                f"  1. Shapefile de Zonas (.shp + componentes) en:\n"
+                f"[bold green]✓ Directory structure created successfully![/]\n\n"
+                f"Please place your source files inside the following directories:\n"
+                f"  1. Zones Shapefile (.shp + components) in:\n"
                 f"     [bold cyan]{raw_zones_dir}/[/]\n"
-                f"  2. Base de datos de Demanda (.mdb) en:\n"
+                f"  2. Demand Database (.mdb) in:\n"
                 f"     [bold cyan]{raw_demand_dir}/[/]\n\n"
-                f"Esperaremos aquí hasta que los coloques.",
+                f"We will wait here until you place the files.",
                 border_style="green"
             ))
             
             confirm_files = Prompt.ask(
-                "[bold yellow]¿Has colocado los archivos de shapefile y base de datos en sus carpetas respectivas? (S/N)[/]",
-                choices=["S", "N", "s", "n"],
-                default="S"
+                "[bold yellow]Have you placed the shapefile and database files in their respective folders? (Y/N)[/]",
+                choices=["Y", "N", "y", "n"],
+                default="Y"
             ).upper()
             if confirm_files == "N":
                 return None
         else:
             console.print(Panel(
-                f"[bold yellow]WIZARD DE INGESTIÓN DE CIUDAD[/]\n"
-                f"Completando el registro para '[bold cyan]{city_key}[/]'.",
+                f"[bold yellow]CITY INGESTION WIZARD[/]\n"
+                f"Completing the registry for '[bold cyan]{city_key}[/]'.",
                 border_style="yellow"
             ))
         
@@ -193,16 +193,16 @@ class DataProvider:
             'ine_region_id': ine_region
         }
         
-        console.print("\n[bold cyan]Fila de Registro Propuesta:[/]")
+        console.print("\n[bold cyan]Proposed Registry Row:[/]")
         for k, v in new_row.items():
             console.print(f"  [bold]{k}:[/] {v}")
             
         confirm_write = Prompt.ask(
-            "[bold yellow]¿Deseas escribir estos parámetros en city_registry.csv? (S/N)[/]",
-            choices=["S", "N", "s", "n"],
-            default="S"
+            "[bold yellow]Would you like to write these parameters to city_registry.csv? (Y/N)[/]",
+            choices=["Y", "N", "y", "n"],
+            default="Y"
         ).upper()
-        if confirm_write == "S":
+        if confirm_write == "Y":
             # Append to registry
             df_new = pd.DataFrame([new_row])
             if os.path.exists(self.registry_path):
@@ -221,7 +221,7 @@ class DataProvider:
             
         return None
 
-    def satisfy_demand_matrix(self, city_key: str, srid: int, od_input_override: Optional[str] = None) -> str:
+    def satisfy_demand_matrix(self, city_key: str, srid: int, od_input_override: Optional[str] = None, yes: bool = False) -> str:
         """
         Ensures a demand matrix exists for the given city, synthesizing it if necessary.
         Conventional Path: data/[city]/proc/od_matrix_micro.csv
@@ -266,6 +266,22 @@ class DataProvider:
             files_exist = False
 
         if files_exist:
+            # Stage Ingestion Hygiene Check (General Spatial Scope Check)
+            try:
+                from core.agents.ingestion_agent import IngestionAgent
+                hygiene_agent = IngestionAgent()
+                # Run audit & sanitize
+                hygiene_agent.audit_and_sanitize(
+                    city_key=city_key,
+                    city_meta=city_meta,
+                    zones_shp_path=zones_source,
+                    demand_folder=demand_folder,
+                    zones_folder=zones_folder,
+                    yes=yes
+                )
+            except Exception as e:
+                print(f"[Ingestion Hygiene Warning] Bypassing active hygiene check: {e}")
+
             # Extract into proc/
             proc_zones_dir = f"{proc_dir}/convention_zones"
             os.makedirs(proc_zones_dir, exist_ok=True)

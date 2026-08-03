@@ -14,7 +14,7 @@ def main():
         'port': 5432
     }
     data_base_path = "data"
-    rec_engine = RecommendationEngine(db_config, data_base_path, "Valdivia, Chile", 32718)
+    rec_engine = RecommendationEngine(db_config, data_base_path, "valdivia", 32718)
     
     seeds = [11520]
     reference_scenario = "current"

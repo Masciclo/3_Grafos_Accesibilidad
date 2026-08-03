@@ -56,18 +56,18 @@ class DirectSQLTemplateStrategy:
 
 class LineagePersistenceStrategy:
     """
-    Concrete strategy to calculate flow delta differentials using Magnetismo a Antecesor (MA) mapping.
+    Concrete strategy to calculate flow delta differentials using Parent Lineage Distance mapping.
     """
-    def __init__(self, sql_base_path: str, ma_distance: float = 7.0):
+    def __init__(self, sql_base_path: str, parent_lineage_dist: float = 7.0):
         self.sql_base_path = sql_base_path
-        self.ma_distance = ma_distance
+        self.parent_lineage_dist = parent_lineage_dist
 
     def calculate(self, conn, current_net: str, baseline_net: str, output_table: str) -> DeltaMetrics:
         execute_query(conn, read_sql_file(os.path.join(self.sql_base_path, 'calculate_delta_flow.sql')).format(
             result_table=output_table,
             current_network=current_net,
             baseline_network=baseline_net,
-            ma_distance=self.ma_distance
+            parent_lineage_dist=self.parent_lineage_dist
         ))
         
         # Get metrics stats from database table
@@ -156,12 +156,83 @@ class ResultsAggregator:
         """
         Finalizes QGIS database layers and views.
         """
+        # Execute static database layers first (network, ciclo, census)
         execute_query(self.conn, read_sql_file(os.path.join(sql_base_path, 'finalize_qgis_layers.sql')).format(
             scenario_prefix=scenario_prefix,
             network_table=net_table,
             h3_table=h3_table,
             ciclo_table=ciclo_table
         ))
+        
+        # Dynamically build and finalize the H3 table based on existing OD purpose columns
+        od_table = f"{scenario_prefix}_od_matrix"
+        purpose_cols = []
+        od_exists = False
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '{od_table}')")
+                od_exists = cur.fetchone()[0]
+                if od_exists:
+                    cur.execute(f"SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{od_table}'")
+                    od_cols = [row[0] for row in cur.fetchall()]
+                    purpose_cols = [c for c in od_cols if c.startswith('trips_') and c != 'trips']
+        except Exception:
+            od_exists = False
+            
+        if od_exists and purpose_cols:
+            with_ctes = []
+            select_fields = []
+            left_joins = []
+            
+            for idx, col in enumerate(purpose_cols):
+                alias = f"p_{idx}"
+                with_ctes.append(f"""
+                    {alias}_trips AS (
+                        SELECT h3_dest, SUM({col}) as sum_val
+                        FROM {od_table}
+                        GROUP BY h3_dest
+                    )
+                """)
+                select_fields.append(f"COALESCE({alias}.sum_val, 0)::FLOAT as {col}")
+                left_joins.append(f"LEFT JOIN {alias}_trips {alias} ON h3.h3_index::text = {alias}.h3_dest::text")
+                
+            ctes_sql = ", ".join(with_ctes)
+            select_sql = ", " + ", ".join(select_fields) if select_fields else ""
+            joins_sql = " ".join(left_joins)
+            
+            h3_query = f"""
+                DROP TABLE IF EXISTS {scenario_prefix}_h3 CASCADE;
+                CREATE TABLE {scenario_prefix}_h3 AS
+                WITH {ctes_sql}
+                SELECT 
+                    h3.h3_index,
+                    h3.geometry,
+                    COALESCE(h3.pop_total, 0) as pop_total,
+                    COALESCE(h3.od_flow, 0) as od_flow,
+                    COALESCE(h3.m_osm, 0) as m_osm,
+                    COALESCE(h3.m_project, 0) as m_project
+                    {select_sql},
+                    TRUE as participating_in_analysis
+                FROM {h3_table} h3
+                {joins_sql};
+            """
+        else:
+            h3_query = f"""
+                DROP TABLE IF EXISTS {scenario_prefix}_h3 CASCADE;
+                CREATE TABLE {scenario_prefix}_h3 AS
+                SELECT 
+                    h3_index,
+                    geometry,
+                    COALESCE(pop_total, 0) as pop_total,
+                    COALESCE(od_flow, 0) as od_flow,
+                    COALESCE(m_osm, 0) as m_osm,
+                    COALESCE(m_project, 0) as m_project,
+                    TRUE as participating_in_analysis
+                FROM {h3_table};
+            """
+            
+        execute_query(self.conn, h3_query)
+        execute_query(self.conn, f"CREATE INDEX IF NOT EXISTS {scenario_prefix}_h3_gix ON {scenario_prefix}_h3 USING GIST (geometry);")
 
     def calculate_mcp(self, scenario_prefix: str, zones_table: str, h3_table: str, sql_base_path: str) -> None:
         """
@@ -200,7 +271,7 @@ class ResultsAggregator:
 
 
 # --- Backward Compatibility Proxies ---
-def run_aggregation_and_delta(conn, args, location_prefix, scenario_prefix, internal_network_table, h3_table_name, osm_table_name, ciclo_table_name, projects_table_name, census_table_name, od_input, census_input, sql_base_path, srid, ma_distance=7.0, callback=None):
+def run_aggregation_and_delta(conn, args, location_prefix, scenario_prefix, internal_network_table, h3_table_name, osm_table_name, ciclo_table_name, projects_table_name, census_table_name, od_input, census_input, sql_base_path, srid, parent_lineage_dist=7.0, callback=None):
     if callback: callback(8, "RUNNING", "Aggregation & Delta Calculation")
     
     SchemaGuard.ensure_h3_parity(conn, h3_table_name)
@@ -221,7 +292,7 @@ def run_aggregation_and_delta(conn, args, location_prefix, scenario_prefix, inte
             baseline_network = final_base
             
         if baseline_network:
-            delta_strategy = LineagePersistenceStrategy(sql_base_path, ma_distance=ma_distance)
+            delta_strategy = LineagePersistenceStrategy(sql_base_path, parent_lineage_dist=parent_lineage_dist)
             aggregator.calculate_delta(internal_network_table, baseline_network, delta_table_name, delta_strategy)
             diagnostic_handler.report("DELTA_COMPLETE", "INFO", f"Delta layer created: {delta_table_name}")
         else:

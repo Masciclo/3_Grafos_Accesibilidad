@@ -12,7 +12,7 @@ WHERE (project_id = '{pid}' AND is_project = TRUE)
    OR (is_project = FALSE AND id IN (
        SELECT base.id FROM {network_table} base, {network_table} proj
        WHERE proj.project_id = '{pid}' AND proj.is_project = TRUE
-         AND ST_DWithin(base.geometry, proj.geometry, {zp_distance})
+         AND ST_DWithin(base.geometry, proj.geometry, {project_influence_dist})
          AND base.is_project = FALSE
    ));
 CREATE INDEX project_zone_context_gix ON project_zone_context USING GIST (geometry);
@@ -68,7 +68,7 @@ SELECT DISTINCT ON (e.geom)
 FROM endpoints e
 CROSS JOIN LATERAL (
     SELECT id, geometry FROM {network_table} 
-    WHERE is_project = FALSE AND ST_DWithin(e.geom, geometry, {mr_distance})
+    WHERE is_project = FALSE AND ST_DWithin(e.geom, geometry, {ref_snap_dist})
     ORDER BY e.geom <-> geometry LIMIT 1
 ) base;
 

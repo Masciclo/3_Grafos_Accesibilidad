@@ -23,22 +23,47 @@ WHERE geometry IS NOT NULL
 CREATE INDEX temp_raw_cycleways_gix ON temp_raw_cycleways USING GIST (geometry);
 ANALYZE temp_raw_cycleways;
 
--- 2. Nodalize (Planarize) crossing lines in the entire network
+-- 2. Identify OSM roads in close proximity (e.g. 50 meters) to cycleways/projects (proximal roads)
+DROP TABLE IF EXISTS temp_osm_proximal;
+CREATE TEMP TABLE temp_osm_proximal AS
+SELECT o.*
+FROM {osm} o
+WHERE o.geometry IS NOT NULL
+  AND EXISTS (
+      SELECT 1 
+      FROM temp_raw_cycleways c 
+      WHERE ST_DWithin(o.geometry, c.geometry, 50.0)
+  );
+CREATE INDEX temp_osm_proximal_gix ON temp_osm_proximal USING GIST (geometry);
+ANALYZE temp_osm_proximal;
+
+-- 2.1. Identify OSM roads that are NOT near cycleways/projects (distal roads)
+DROP TABLE IF EXISTS temp_osm_distal;
+CREATE TEMP TABLE temp_osm_distal AS
+SELECT o.*
+FROM {osm} o
+WHERE o.geometry IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 
+      FROM temp_raw_cycleways c 
+      WHERE ST_DWithin(o.geometry, c.geometry, 50.0)
+  );
+
+-- 2.2. Nodalize ONLY the cycleways and the proximal OSM roads
 DROP TABLE IF EXISTS temp_nodalized_lines;
 CREATE TEMP TABLE temp_nodalized_lines AS
 SELECT (ST_Dump(ST_Node(ST_Collect(geometry)))).geom as geometry
 FROM (
     SELECT geometry FROM temp_raw_cycleways
     UNION ALL
-    SELECT geometry FROM {osm} WHERE geometry IS NOT NULL
+    SELECT geometry FROM temp_osm_proximal
 ) t;
-
 CREATE INDEX temp_nodalized_lines_gix ON temp_nodalized_lines USING GIST (geometry);
 ANALYZE temp_nodalized_lines;
 
--- 3. Match back attributes using precise Centroid ST_DWithin (0.2m tolerance to absorb float rounding errors)
-DROP TABLE IF EXISTS matched_all;
-CREATE TEMP TABLE matched_all AS
+-- 3. Match back attributes for proximal nodalized lines
+DROP TABLE IF EXISTS matched_nodalized;
+CREATE TEMP TABLE matched_nodalized AS
 SELECT DISTINCT ON (ST_AsBinary(n.geometry)) 
     n.geometry,
     COALESCE(
@@ -76,8 +101,33 @@ SELECT DISTINCT ON (ST_AsBinary(n.geometry))
     END as parent_baseline_id
 FROM temp_nodalized_lines n
 LEFT JOIN temp_raw_cycleways c ON ST_DWithin(ST_LineInterpolatePoint(n.geometry, 0.5), c.geometry, 0.20)
-LEFT JOIN {osm} o ON ST_DWithin(ST_LineInterpolatePoint(n.geometry, 0.5), o.geometry, 0.20)
+LEFT JOIN temp_osm_proximal o ON ST_DWithin(ST_LineInterpolatePoint(n.geometry, 0.5), o.geometry, 0.20)
 ORDER BY ST_AsBinary(n.geometry), (c.geometry IS NOT NULL) DESC;
+
+-- 3.1. Combine matched nodalized lines with distal OSM roads (which are kept completely intact!)
+DROP TABLE IF EXISTS matched_all;
+CREATE TEMP TABLE matched_all AS
+SELECT 
+    geometry,
+    impedance,
+    highway,
+    original_highway,
+    is_project,
+    project_id,
+    parent_baseline_id
+FROM matched_nodalized
+
+UNION ALL
+
+SELECT 
+    geometry,
+    impedance,
+    highway,
+    highway as original_highway,
+    is_project,
+    project_id,
+    parent_baseline_id::integer
+FROM temp_osm_distal;
 
 -- 4. Create output network table (explicitly ordered to ensure 100% deterministic SERIAL primary keys across runs)
 CREATE TABLE {result_name} AS

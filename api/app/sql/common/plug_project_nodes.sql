@@ -38,7 +38,7 @@ CROSS JOIN LATERAL (
     SELECT v.id 
     FROM {network_table}_vertices_pgr v
     WHERE v.id NOT IN (SELECT node_id FROM isolated_project_nodes) -- Don't snap to other isolated project nodes
-      AND ST_DWithin(i.the_geom, v.the_geom, {mr_distance})
+      AND ST_DWithin(i.the_geom, v.the_geom, {ref_snap_dist})
       -- MUST be connected to the city
       AND EXISTS (SELECT 1 FROM {network_table} e WHERE (e.source = v.id OR e.target = v.id) AND (e.project_id != '{pid}' OR e.project_id IS NULL))
     ORDER BY i.the_geom <-> v.the_geom

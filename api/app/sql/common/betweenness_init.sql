@@ -4,6 +4,7 @@ DROP TABLE IF EXISTS {network_table}_betweenness_results;
 CREATE TABLE {network_table}_betweenness_results (
     edge_id bigint,
     flow numeric
+    {extra_columns}
 );
 
 -- Create index to speed up the final aggregation

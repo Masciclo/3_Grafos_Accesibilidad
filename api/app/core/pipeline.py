@@ -20,9 +20,9 @@ class ScenarioConfig:
     bbox: Optional[List[float]] = None
     
     # Magnetism & Topology Parameters (Phase 18)
-    mr_distance: float = 5.0
-    ma_distance: float = 7.0
-    zp_distance: float = 25.0
+    ref_snap_dist: float = 5.0
+    parent_lineage_dist: float = 7.0
+    project_influence_dist: float = 25.0
     
     # Impedance Parameters
     buffer_size: int = 15

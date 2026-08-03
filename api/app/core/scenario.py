@@ -81,10 +81,18 @@ class ScenarioEngine:
             # Close the loop: Train model with the new data point
             telemetry_manager.train_model()
             
-            conn.commit()
+            if conn and not conn.closed:
+                try:
+                    conn.commit()
+                except Exception as commit_err:
+                    observer.report_diagnostic("FINAL_COMMIT_WARNING", "WARNING", f"Final commit bypassed: {commit_err}")
 
         except Exception as e:
-            conn.rollback()
+            if conn and not conn.closed:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
             observer.report_diagnostic("ENGINE_CRASH", "ERROR", f"ScenarioEngine Pipeline Crash: {str(e)}")
             raise e
         finally:

@@ -92,7 +92,7 @@ class ResultsTask(PipelineTask):
                 baseline_network = final_base
                 
             if baseline_network:
-                delta_strategy = results.LineagePersistenceStrategy(sql_path, ma_distance=config.ma_distance)
+                delta_strategy = results.LineagePersistenceStrategy(sql_path, parent_lineage_dist=config.parent_lineage_dist)
                 metrics = aggregator.calculate_delta(tables['net'], baseline_network, delta_table_name, delta_strategy)
                 results.diagnostic_handler.report("DELTA_COMPLETE", "INFO", f"Delta layer created: {metrics.delta_table_name}")
             else:

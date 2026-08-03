@@ -30,7 +30,7 @@ class DemandSynthesizer:
         
         # Identify ID column case-insensitively
         id_col = None
-        candidates = ['zona', 'zona_eod', 'zonas_eod', 'id', 'objectid']
+        candidates = ['zona', 'zona_eod', 'zonas_eod', 'id_zona', 'id', 'objectid']
         for col in zones_gdf.columns:
             if col.lower() in candidates:
                 id_col = col
@@ -137,11 +137,8 @@ class DemandSynthesizer:
         od_macro['Zona_Origen'] = pd.to_numeric(od_macro['Zona_Origen'], errors='coerce').fillna(0).astype(int)
         od_macro['Zona_Destino'] = pd.to_numeric(od_macro['Zona_Destino'], errors='coerce').fillna(0).astype(int)
         
-        # Backward compatibility for matrices without purpose columns
-        if 'trips_returning_home' not in od_macro.columns:
-            od_macro['trips_returning_home'] = od_macro['Viajes_Totales'] * 0.5
-        if 'trips_outgoing_destinations' not in od_macro.columns:
-            od_macro['trips_outgoing_destinations'] = od_macro['Viajes_Totales'] * 0.5
+        # Identify purpose columns dynamically (columns starting with 'trips_')
+        purpose_cols = [c for c in od_macro.columns if c.startswith('trips_') and c != 'trips']
 
         # Calculate relative weights within zones
         zone_totals = h3_enriched.groupby('eod_zona')['pop_h3'].sum().reset_index()
@@ -174,10 +171,11 @@ class DemandSynthesizer:
             
             # Step 3: Math and Filter
             m_chunk['trips'] = m_chunk['Viajes_Totales'] * m_chunk['w_o'] * m_chunk['w_d']
-            m_chunk['trips_returning_home'] = m_chunk['trips_returning_home'] * m_chunk['w_o'] * m_chunk['w_d']
-            m_chunk['trips_outgoing_destinations'] = m_chunk['trips_outgoing_destinations'] * m_chunk['w_o'] * m_chunk['w_d']
+            for col in purpose_cols:
+                m_chunk[col] = m_chunk[col] * m_chunk['w_o'] * m_chunk['w_d']
             
-            m_chunk = m_chunk[m_chunk['trips'] > 0.1][['h3_origin', 'h3_dest', 'trips', 'trips_returning_home', 'trips_outgoing_destinations']]
+            output_cols = ['h3_origin', 'h3_dest', 'trips'] + purpose_cols
+            m_chunk = m_chunk[m_chunk['trips'] > 0.1][output_cols]
             
             total_micro_pairs += len(m_chunk)
             
@@ -206,7 +204,7 @@ class DemandSynthesizer:
         
         # Check for ID column case-insensitively
         id_col = None
-        candidates = ['zona', 'zona_eod', 'zonas_eod', 'id', 'objectid']
+        candidates = ['zona', 'zona_eod', 'zonas_eod', 'id_zona', 'id', 'objectid']
         for col in zones.columns:
             if col.lower() in candidates:
                 id_col = col
@@ -259,7 +257,7 @@ class DemandSynthesizer:
             
         v_cols = {c.lower(): c for c in v_fieldnames} if v_fieldnames else {}
         
-        factor_candidates = ['factor', 'factor_expansion', 'factor_laboralnormal', 'factorlaboralnormal', 'factorexpansion', 'factor_exp']
+        factor_candidates = ['factor', 'factor_expansion', 'factorexpansion', 'factor_exp']
         v_factor_col = None
         for cand in factor_candidates:
             if v_cols.get(cand):
@@ -270,21 +268,57 @@ class DemandSynthesizer:
         if not v_factor_col:
             print("   - [Synthesizer] Direct factor column not found in Viaje table. Loading Persona table factors (fallback)...")
             try:
-                cmd_p = f'mdb-export "{mdb_path}" Persona'
-                proc_p = subprocess.Popen(['bash', '-c', cmd_p], stdout=subprocess.PIPE, text=True)
-                reader_p = csv.DictReader(proc_p.stdout)
-                p_cols = {c.lower(): c for c in reader_p.fieldnames}
+                # Get headers first to resolve column names dynamically
+                cmd_hdr = f'mdb-export "{mdb_path}" Persona'
+                proc_hdr = subprocess.Popen(['bash', '-c', cmd_hdr], stdout=subprocess.PIPE, text=True)
+                header_line = proc_hdr.stdout.readline()
+                proc_hdr.terminate()
+                proc_hdr.wait()
                 
-                f_col = p_cols.get('factor') or p_cols.get('factor_expansion') or p_cols.get('factor_laboralnormal')
+                if not header_line:
+                    raise ValueError("Failed to retrieve Persona table headers.")
+                    
+                fieldnames = [name.strip() for name in header_line.split(',')]
+                p_cols = {c.lower(): c for c in fieldnames}
+                
+                f_col = p_cols.get('factor') or p_cols.get('factor_expansion')
+                f_weekday_col = p_cols.get('factor_laboralnormal') or p_cols.get('factorlaboralnormal')
                 id_f = p_cols.get('idfolio') or p_cols.get('hogar') or p_cols.get('folio')
                 id_p = p_cols.get('idpersona') or p_cols.get('persona')
                 
                 if not id_f or not id_p:
-                    raise KeyError(f"Could not find Hogar/IdFolio or Persona/IdPersona columns in Persona table. Columns: {list(p_cols.values())}")
+                    raise KeyError(f"Could not find Hogar/IdFolio or Persona/IdPersona columns in Persona table. Columns: {fieldnames}")
+                
+                # Build and execute dynamic SELECT query to load only the resolved columns
+                select_cols = [id_f, id_p]
+                if f_col: select_cols.append(f_col)
+                if f_weekday_col: select_cols.append(f_weekday_col)
+                
+                cols_sql = ", ".join([f'"{c}"' for c in select_cols])
+                sql_query = f"SELECT {cols_sql} FROM Persona;"
+                
+                cmd_p = f'echo "{sql_query}" | mdb-sql -P -H -d "," "{mdb_path}"'
+                proc_p = subprocess.Popen(['bash', '-c', cmd_p], stdout=subprocess.PIPE, text=True)
+                
+                import csv
+                reader_p = csv.reader(proc_p.stdout)
                 
                 for row in reader_p:
-                    val = row[f_col] if f_col else 1.0
-                    factors[(row[id_f], row[id_p])] = float(val) if val else 1.0
+                    if len(row) >= 2:
+                        hogar = row[0].strip()
+                        persona = row[1].strip()
+                        
+                        factor_val = 1.0
+                        # If weekday factor is selected and available
+                        if f_weekday_col and len(row) >= len(select_cols) and row[-1].strip():
+                            factor_val = float(row[-1].strip())
+                        # Otherwise if general factor is selected and available
+                        elif f_col and len(row) >= 3 and row[2].strip():
+                            factor_val = float(row[2].strip())
+                            
+                        factors[(hogar, persona)] = factor_val
+                        
+                proc_p.wait()
             except Exception as e:
                 print(f"   - [Warning] Factor extraction failed: {e}. Using 1.0 fallback.")
         else:
@@ -292,6 +326,15 @@ class DemandSynthesizer:
 
         # 2. Extract and Expand Trips
         matrix = {}
+        purpose_mapping = {
+            '1': 'trips_work',
+            '2': 'trips_study',
+            '3': 'trips_shopping',
+            '4': 'trips_personal',
+            '5': 'trips_recreational',
+            '6': 'trips_returning_home'
+        }
+        
         try:
             cmd_v = f'mdb-export "{mdb_path}" Viaje'
             proc_v = subprocess.Popen(['bash', '-c', cmd_v], stdout=subprocess.PIPE, text=True)
@@ -301,7 +344,13 @@ class DemandSynthesizer:
             d_col = v_cols.get('zonadestino') or v_cols.get('zona_destino') or v_cols.get('destino')
             vid_f = v_cols.get('idfolio') or v_cols.get('hogar') or v_cols.get('folio')
             vid_p = v_cols.get('idpersona') or v_cols.get('persona')
-            prop_col = v_cols.get('proposito') or v_cols.get('proposito_viaje')
+            
+            # Find purpose column if it exists
+            prop_col = None
+            for cand in ['proposito', 'proposito_viaje', 'proposito_via', 'prop']:
+                if v_cols.get(cand):
+                    prop_col = v_cols.get(cand)
+                    break
             
             if not o_col or not d_col:
                 raise KeyError(f"Missing ZonaOrigen/ZonaDestino columns in Viaje table. Columns: {list(v_cols.values())}")
@@ -317,24 +366,38 @@ class DemandSynthesizer:
                 else:
                     f = factors.get((row[vid_f], row[vid_p]), 1.0)
                     
-                prop = row.get(prop_col, '') if prop_col else ''
-                is_home = (prop == '6')
+                prop = row.get(prop_col, '').strip() if prop_col else ''
+                purpose_key = purpose_mapping.get(prop)
                 
                 if (o, d) not in matrix:
-                    matrix[(o, d)] = {'total': 0.0, 'home': 0.0, 'dest': 0.0}
+                    matrix[(o, d)] = {'total': 0.0}
+                    if prop_col:
+                        for pk in purpose_mapping.values():
+                            matrix[(o, d)][pk] = 0.0
                 
                 matrix[(o, d)]['total'] += f
-                if is_home:
-                    matrix[(o, d)]['home'] += f
-                else:
-                    matrix[(o, d)]['dest'] += f
+                if prop_col and purpose_key:
+                    matrix[(o, d)][purpose_key] += f
             
             # Save to temp macro CSV
             with open(output_csv, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['Zona_Origen', 'Zona_Destino', 'Viajes_Totales', 'trips_returning_home', 'trips_outgoing_destinations'])
+                header = ['Zona_Origen', 'Zona_Destino', 'Viajes_Totales']
+                active_purposes = []
+                if prop_col:
+                    # Only output purpose columns that actually received trips
+                    for pk in purpose_mapping.values():
+                        total_p_trips = sum(item[pk] for item in matrix.values())
+                        if total_p_trips > 0.0:
+                            active_purposes.append(pk)
+                    header.extend(active_purposes)
+                
+                writer.writerow(header)
                 for (o, d), data in matrix.items():
-                    writer.writerow([o, d, data['total'], data['home'], data['dest']])
+                    row_data = [o, d, data['total']]
+                    for pk in active_purposes:
+                        row_data.append(data[pk])
+                    writer.writerow(row_data)
             return output_csv
         except Exception as e:
             raise RuntimeError(f"Failed to extract OD matrix: {e}")

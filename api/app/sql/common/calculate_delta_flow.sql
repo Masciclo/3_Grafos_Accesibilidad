@@ -53,19 +53,19 @@ SET flow_baseline = m.weighted_baseline_flow,
 FROM location_matches m
 WHERE r.edge_id = m.id;
 
--- 4. LAYER 2: Topological Shatter (Magnetismo a Antecesor - MA)
--- Rule A Implementation: Weighted average for fragmented segments using MA distance.
+-- 4. LAYER 2: Topological Shatter (Parent Lineage Distance - parent_lineage_dist)
+-- Rule A Implementation: Weighted average for fragmented segments using parent_lineage_dist.
 WITH fragments AS (
     SELECT 
         curr.id, 
-        SUM(base.od_flow * ST_Length(ST_Intersection(curr.geometry, ST_Buffer(base.geometry, {ma_distance})))) / 
-        NULLIF(SUM(ST_Length(ST_Intersection(curr.geometry, ST_Buffer(base.geometry, {ma_distance})))), 0) as weighted_baseline_flow
+        SUM(base.od_flow * ST_Length(ST_Intersection(curr.geometry, ST_Buffer(base.geometry, {parent_lineage_dist})))) / 
+        NULLIF(SUM(ST_Length(ST_Intersection(curr.geometry, ST_Buffer(base.geometry, {parent_lineage_dist})))), 0) as weighted_baseline_flow
     FROM {current_network} curr
     JOIN {baseline_network} base 
-        ON curr.geometry && ST_Expand(base.geometry, {ma_distance})
-        AND ST_DWithin(curr.geometry, base.geometry, {ma_distance})
+        ON curr.geometry && ST_Expand(base.geometry, {parent_lineage_dist})
+        AND ST_DWithin(curr.geometry, base.geometry, {parent_lineage_dist})
     WHERE curr.id NOT IN (SELECT edge_id FROM {result_table} WHERE participating_in_analysis = TRUE)
-      AND ST_Length(ST_Intersection(curr.geometry, ST_Buffer(base.geometry, {ma_distance}))) / NULLIF(ST_Length(curr.geometry), 0) > 0.65
+      AND ST_Length(ST_Intersection(curr.geometry, ST_Buffer(base.geometry, {parent_lineage_dist}))) / NULLIF(ST_Length(curr.geometry), 0) > 0.65
     GROUP BY curr.id
 )
 UPDATE {result_table} r

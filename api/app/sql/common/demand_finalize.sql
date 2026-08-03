@@ -14,6 +14,3 @@ WHERE n.id = sub.edge_id;
 
 -- Ensure edges with NO flow are set to 0 instead of NULL
 UPDATE {network_table} SET od_flow = 0 WHERE od_flow IS NULL;
-
--- Cleanup
-DROP TABLE IF EXISTS {network_table}_betweenness_results;

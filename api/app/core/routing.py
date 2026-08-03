@@ -86,7 +86,21 @@ class RoutingOrchestrator:
             )
             
             # 4. Node Consolidation (Prevents redundant routing cycles)
-            diagnostic_handler.report("DEMAND_CONSOLIDATION", "INFO", "Consolidating H3 demand into unique graph nodes...")
+            # Query column names of the OD matrix table dynamically
+            with self.conn.cursor() as cursor:
+                cursor.execute(f"SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{od_table_name}'")
+                od_cols = [row[0] for row in cursor.fetchall()]
+            
+            # Identify columns starting with 'trips_' (excluding trips general)
+            purpose_cols = [c for c in od_cols if c.startswith('trips_') and c != 'trips']
+            
+            # Build dynamic consolidation query
+            purpose_sums = []
+            for col in purpose_cols:
+                purpose_sums.append(f"SUM(m.{col}) as {col}")
+            sums_sql = ", " + ", ".join(purpose_sums) if purpose_sums else ""
+
+            diagnostic_handler.report("DEMAND_CONSOLIDATION", "INFO", f"Consolidating H3 demand (found {len(purpose_cols)} trip purposes)...")
             consolidated_table = f"{scenario_prefix}_node_demand_consolidated"
             execute_query(self.conn, f"DROP TABLE IF EXISTS {consolidated_table} CASCADE;")
             execute_query(self.conn, f"""
@@ -94,7 +108,7 @@ class RoutingOrchestrator:
                 SELECT 
                     o.node_id as source_node,
                     d.node_id as target_node,
-                    SUM(m.trips) as total_trips
+                    SUM(m.trips) as total_trips{sums_sql}
                 FROM {od_table_name} m
                 JOIN {scenario_prefix}_h3_to_node o ON m.h3_origin::text = o.h3_index::text
                 JOIN {scenario_prefix}_h3_to_node d ON m.h3_dest::text = d.h3_index::text
@@ -104,16 +118,32 @@ class RoutingOrchestrator:
 
             # 5. Batch routing step setup
             execute_query(self.conn, "SET work_mem = '128MB';")
-            execute_query(self.conn, read_sql_file(os.path.join(self.sql_base_path, 'betweenness_init.sql')).format(network_table=internal_network_table))
+            
+            # Formulate betweenness_init.sql with extra columns
+            extra_cols_sql = ""
+            if purpose_cols:
+                extra_cols_sql = ", " + ", ".join([f"{col} numeric" for col in purpose_cols])
+            
+            execute_query(self.conn, read_sql_file(os.path.join(self.sql_base_path, 'betweenness_init.sql')).format(
+                network_table=internal_network_table,
+                extra_columns=extra_cols_sql
+            ))
 
             with self.conn.cursor() as cursor:
                 cursor.execute(f"SELECT DISTINCT source_node FROM {scenario_prefix}_node_demand_consolidated")
                 all_origins = [row[0] for row in cursor.fetchall()]
 
-            diagnostic_handler.report("BATCH_ROUTING", "INFO", f"Executing A* Routing for {len(all_origins)} origins in chunks of 500...")
+            diagnostic_handler.report("BATCH_ROUTING", "INFO", f"Executing A* Routing for {len(all_origins)} origins in chunks of 50...")
             
-            chunk_size = 500
+            chunk_size = 50
             query_template = read_sql_file(os.path.join(self.sql_base_path, 'od_routing_step_astar.sql'))
+
+            # Setup dynamic insert/select column formats
+            insert_cols_sql = ""
+            select_cols_sql = ""
+            if purpose_cols:
+                insert_cols_sql = ", " + ", ".join(purpose_cols)
+                select_cols_sql = ", " + ", ".join([f"d.{col} as {col}" for col in purpose_cols])
 
             for i in range(0, len(all_origins), chunk_size):
                 chunk = all_origins[i:i + chunk_size]
@@ -123,7 +153,9 @@ class RoutingOrchestrator:
                         location_prefix=scenario_prefix,
                         origin_id=origin_id,
                         edge_weight_column='cost',
-                        directed='false'
+                        directed='false',
+                        insert_cols=insert_cols_sql,
+                        select_cols=select_cols_sql
                     ))
                 self.conn.commit()
                 if self.observer:
@@ -132,5 +164,28 @@ class RoutingOrchestrator:
                     print(f"     * Routed {i + len(chunk)}/{len(all_origins)} origins...")
 
             execute_query(self.conn, read_sql_file(os.path.join(self.sql_base_path, 'demand_finalize.sql')).format(network_table=internal_network_table))
+
+            # Option B: Create and populate flow_by_purpose relation
+            flow_purpose_table = f"{internal_network_table}_flow_by_purpose"
+            execute_query(self.conn, f"DROP TABLE IF EXISTS {flow_purpose_table} CASCADE;")
+            execute_query(self.conn, f"""
+                CREATE TABLE {flow_purpose_table} (
+                    edge_id bigint,
+                    purpose varchar(50),
+                    flow numeric
+                );
+            """)
+            
+            for p_col in purpose_cols:
+                clean_purpose = p_col.replace("trips_", "")
+                execute_query(self.conn, f"""
+                    INSERT INTO {flow_purpose_table} (edge_id, purpose, flow)
+                    SELECT edge_id, '{clean_purpose}', SUM({p_col})
+                    FROM {internal_network_table}_betweenness_results
+                    GROUP BY edge_id;
+                """)
+                
+            # Cleanup temporary tables
+            execute_query(self.conn, f"DROP TABLE IF EXISTS {internal_network_table}_betweenness_results;")
 
         return full_components_table

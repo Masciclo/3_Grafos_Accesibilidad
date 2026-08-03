@@ -19,7 +19,7 @@ nearest_base AS (
     FROM endpoints e
     CROSS JOIN LATERAL (
         SELECT id, geometry FROM {network_table} 
-        WHERE is_project = FALSE AND ST_DWithin(e.geom, geometry, {mr_distance})
+        WHERE is_project = FALSE AND ST_DWithin(e.geom, geometry, {ref_snap_dist})
         ORDER BY e.geom <-> geometry LIMIT 1
     ) base
 )
@@ -61,7 +61,7 @@ END $$;
 
 -- 4. FORCED CONTINUITY
 WITH zp_buffer AS (
-    SELECT ST_Union(ST_Buffer(geometry, {zp_distance})) as geom
+    SELECT ST_Union(ST_Buffer(geometry, {project_influence_dist})) as geom
     FROM {network_table} WHERE is_project = TRUE AND project_id = '{pid}'
 ),
 trapped_segments AS (

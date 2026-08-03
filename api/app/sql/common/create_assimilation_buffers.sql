@@ -7,7 +7,7 @@ DROP TABLE IF EXISTS {result_table};
 CREATE TABLE {result_table} AS
 SELECT 
     id as project_id,
-    ST_Union(ST_Buffer(geometry, {mr_distance})) as geometry
+    ST_Union(ST_Buffer(geometry, {ref_snap_dist})) as geometry
 FROM {projects_table}
 GROUP BY id;
 
@@ -18,5 +18,5 @@ CREATE INDEX {result_table}_gix ON {result_table} USING GIST (geometry);
 DO $$
 BEGIN
     RAISE NOTICE 'Assimilation buffers created for % projects using MR=%m', 
-        (SELECT COUNT(*) FROM {result_table}), {mr_distance};
+        (SELECT COUNT(*) FROM {result_table}), {ref_snap_dist};
 END $$;
