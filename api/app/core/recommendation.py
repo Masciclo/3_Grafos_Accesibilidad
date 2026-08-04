@@ -50,7 +50,7 @@ class RecommendationEngine:
             self.db_config['password']
         )
 
-    def run_recommendation_pipeline(self, prompt: str, reference_scenario: str, sample_size: int, study_area_bbox: list) -> str:
+    def run_recommendation_pipeline(self, prompt: str, reference_scenario: str, sample_size: int, study_area_bbox: list, budget_m: float = 1500.0, num_projects: int = 10) -> str:
         """
         Orchestrates the entire generative cycleway optimization pipeline:
         1. Launches the interactive grilling session to collect project definitions.

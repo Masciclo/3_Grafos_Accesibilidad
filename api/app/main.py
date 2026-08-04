@@ -264,7 +264,9 @@ def main():
                     prompt=args.recommendation,
                     reference_scenario=args.reference_scenario,
                     sample_size=args.rec_sample_size,
-                    study_area_bbox=study_area_bbox
+                    study_area_bbox=study_area_bbox,
+                    budget_m=args.rec_budget_m,
+                    num_projects=args.rec_num_projects
                 )
                 
                 if not rec_geojson_path:
@@ -288,7 +290,7 @@ def main():
                 cleanup=args.cleanup, mapping=args.mapping,
                 ref_snap_dist=args.ref_snap_dist,
                 parent_lineage_dist=args.parent_lineage_dist,
-                project_influence_dist=args.project_influence_dist
+                project_influence_dist=args.manual_digitization_error
             )
             
             args.od_input = validated_od
