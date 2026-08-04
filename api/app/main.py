@@ -60,16 +60,14 @@ def main():
     parser.add_argument("--buffer_size", dest="buffer_size", type=int, default=15)
     parser.add_argument("--ref_snap_dist", dest="ref_snap_dist", type=float, default=5.0, help="Reference Snapping Distance (buffer size to align streets to project)")
     parser.add_argument("--parent_lineage_dist", dest="parent_lineage_dist", type=float, default=7.0, help="Parent Lineage Distance (search radius to map refactored segments back to baseline)")
-    parser.add_argument("--project_influence_dist", dest="project_influence_dist", type=float, default=25.0, help="Project Influence Distance (clipping buffer size around project for audit)")
-    parser.add_argument("--imp_primary", dest="imp_primary", type=float, default=15.0)
-    parser.add_argument("--imp_secondary", dest="imp_secondary", type=float, default=7.0)
-    parser.add_argument("--imp_tertiary", dest="imp_tertiary", type=float, default=3.0)
-    parser.add_argument("--imp_local", dest="imp_local", type=float, default=1.5)
-    parser.add_argument("--imp_bike", dest="imp_bike", type=float, default=0.5)
-    parser.add_argument("--inhibit", dest="inhibit", type=int, default=1)
-    parser.add_argument("--disinhibit", dest="disinhibit", type=int, default=1)
+    # --- Greedy Growth & Generative Optimization Flags ---
     parser.add_argument("--recommendation", dest="recommendation", type=str, help="Natural language prompt for AI-assisted cycleway design recommendations")
+    parser.add_argument("--rec_budget_m", dest="rec_budget_m", type=float, default=1500.0, help="Allocated budget per project corridor in meters (default: 1500.0m)")
+    parser.add_argument("--rec_num_projects", dest="rec_num_projects", type=int, default=10, help="Number of sequential project corridors to generate (default: 10)")
+
+    # --- Computational Sampling & Performance Parameters ---
     parser.add_argument("--rec_sample_size", dest="rec_sample_size", type=int, default=1000, help="Uniform sample size of active OD pairs to accelerate greedy optimization")
+    parser.add_argument("--project_geographic_reach", "--project_influence_dist", dest="project_geographic_reach", type=float, default=25.0, help="Project Geographic Reach / Influence Radius (spatial clipping buffer in meters around project corridors for high-performance audit)")
 
     args = parser.parse_args()
     args.machine_hash = telemetry_manager.machine_hash # Inject for UI
