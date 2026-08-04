@@ -67,7 +67,7 @@ def main():
 
     # --- Computational Sampling & Performance Parameters ---
     parser.add_argument("--rec_sample_size", dest="rec_sample_size", type=int, default=1000, help="Uniform sample size of active OD pairs to accelerate greedy optimization")
-    parser.add_argument("--project_geographic_reach", "--project_influence_dist", dest="project_geographic_reach", type=float, default=25.0, help="Project Geographic Reach / Influence Radius (spatial clipping buffer in meters around project corridors for high-performance audit)")
+    parser.add_argument("--manual_digitization_error", "--project_geographic_reach", "--project_influence_dist", dest="manual_digitization_error", type=float, default=25.0, help="Manual Digitization Error tolerance buffer in meters around project corridors for spatial snapping and audit")
 
     args = parser.parse_args()
     args.machine_hash = telemetry_manager.machine_hash # Inject for UI
