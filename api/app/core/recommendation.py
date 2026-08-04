@@ -88,6 +88,10 @@ class RecommendationEngine:
             turn = grill_agent.grill_turn(messages)
             if turn.status == "COMPLETE" and turn.config:
                 project_config = turn.config
+                if budget_m and budget_m > 0:
+                    project_config.budget_meters = int(budget_m)
+                if num_projects and num_projects > 0:
+                    project_config.num_projects = int(num_projects)
                 break
             else:
                 # Print question in bold yellow

@@ -60,6 +60,15 @@ def main():
     parser.add_argument("--buffer_size", dest="buffer_size", type=int, default=15)
     parser.add_argument("--ref_snap_dist", dest="ref_snap_dist", type=float, default=5.0, help="Reference Snapping Distance (buffer size to align streets to project)")
     parser.add_argument("--parent_lineage_dist", dest="parent_lineage_dist", type=float, default=7.0, help="Parent Lineage Distance (search radius to map refactored segments back to baseline)")
+    # --- Road Impedance & Suitability Multipliers ---
+    parser.add_argument("--imp_primary", dest="imp_primary", type=float, default=15.0, help="Impedance multiplier for primary motorways (default: 15.0)")
+    parser.add_argument("--imp_secondary", dest="imp_secondary", type=float, default=7.0, help="Impedance multiplier for secondary avenues (default: 7.0)")
+    parser.add_argument("--imp_tertiary", dest="imp_tertiary", type=float, default=3.0, help="Impedance multiplier for tertiary roads (default: 3.0)")
+    parser.add_argument("--imp_local", dest="imp_local", type=float, default=1.5, help="Impedance multiplier for local residential streets (default: 1.5)")
+    parser.add_argument("--imp_bike", dest="imp_bike", type=float, default=0.5, help="Impedance multiplier for dedicated cycleways (default: 0.5)")
+    parser.add_argument("--inhibit", dest="inhibit", type=int, default=1, help="Inhibit unpaved / high-hazard links (default: 1)")
+    parser.add_argument("--disinhibit", dest="disinhibit", type=int, default=1, help="Disinhibit specific arterial links (default: 1)")
+
     # --- Greedy Growth & Generative Optimization Flags ---
     parser.add_argument("--recommendation", dest="recommendation", type=str, help="Natural language prompt for AI-assisted cycleway design recommendations")
     parser.add_argument("--rec_budget_m", dest="rec_budget_m", type=float, default=1500.0, help="Allocated budget per project corridor in meters (default: 1500.0m)")
