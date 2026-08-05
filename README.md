@@ -1,6 +1,6 @@
 # 🚴‍♂️ +Ciclo: REVIEW. REPAIR. RECOMMEND.
 
-> **Observe netowrk bikeabilities, plan projects and measure the changes**
+> **Observe network bikeabilities, plan projects and measure the changes**
 
 
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
