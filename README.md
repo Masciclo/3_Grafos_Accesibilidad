@@ -10,11 +10,7 @@
 
 ---
 
-## 🔍 1. REVIEW: Baseline Evaluation & Diagnostics
-
-Evaluate existing street network conditions, compute OD-weighted betweenness centrality, and isolate major traffic barriers before investing capital.
-
-### ⚡ Quickstart & Installation Guide
+## ⚡ Quickstart & Installation Guide
 
 #### Prerequisites
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with Docker Compose)
