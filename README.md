@@ -111,24 +111,9 @@ docker compose run --rm ciclo-py python main.py \
                      └──────────────┬──────────────┘
 ```
 
-### 📊 H3 Hexagonal Area-Proportional Interpolation
-Coarse administrative OD zones are disaggregated onto an **H3 hexagonal grid** using population-weighted area interpolation:
-
-$$P_H = \sum_B \left( P_B \times \frac{\text{Area}(B \cap H)}{\text{Area}(B)} \right)$$
-
-$$T(o, d) = T_{\text{macro}}(Z_o, Z_d) \times \frac{P_o}{P_{Z_o}} \times \frac{P_d}{P_{Z_d}}$$
-
-### ⚡ Big-O Computational Acceleration
-To solve betweenness centrality across large metropolitan graphs without memory overflow:
-
-| Routing Algorithm | Computational Complexity | Santiago Runtime ($623\text{k}$ edges) | Use Case |
-| :--- | :---: | :---: | :--- |
-| **Exact All-Pairs Betweenness** | $\mathcal{O}(\|V\|^2 \log \|V\|)$ | $\sim 17\text{ hours } 26\text{ min}$ | Full offline benchmark |
-| **Batch Uniform Sampling (BUS)** | $\mathcal{O}(q \cdot \|V\| \log \|V\|)$ | **$\sim 1 - 3\text{ minutes}$** | Interactive sketching & recommendations |
-
 ---
 
-## 🎛️ 5. CLI Flags Reference Guide
+## 🎛️ 4. CLI Flags Reference Guide
 
 | Flag | Category | Default | Description |
 | :--- | :---: | :---: | :--- |
@@ -145,7 +130,7 @@ To solve betweenness centrality across large metropolitan graphs without memory 
 
 ---
 
-## 🎓 6. Academic Citation & License
+## 🎓 5. Academic Citation & License
 
 If you use **+Ciclo** in your academic research, thesis, or urban planning work, please cite:
 
