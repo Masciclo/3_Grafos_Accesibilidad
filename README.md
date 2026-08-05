@@ -2,7 +2,7 @@
 
 > **Active Mobility Demand Assignment, Topological Refactoring & Generative Network Design Engine**
 
-[![White Paper](https://img.shields.io/badge/White_Paper-Read-purple.svg)](link_to_your_white_paper.pdf)
+
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker_Compose-Active-brightgreen)](docker-compose.yml)
 [![PostGIS](https://img.shields.io/badge/PostGIS-3.3+-blue)](https://postgis.net/)
@@ -10,6 +10,7 @@
 [![H3 Grid](https://img.shields.io/badge/H3_Discrete_Grid-Res_8%2F9-hexagon)](https://h3geo.org/)
 
 ---
+📖 **Read the full methodology and findings in our [Official White Paper](https://drive.google.com/file/d/1j642zYba9TTjiMBhoMNBMaKaOIiPZvg8/view?usp=sharing).**
 
 ## ⚡ Quickstart & Installation Guide
 
