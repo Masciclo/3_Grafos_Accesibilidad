@@ -9,27 +9,7 @@
 [![H3 Grid](https://img.shields.io/badge/H3_Discrete_Grid-Res_8%2F9-hexagon)](https://h3geo.org/)
 
 ---
-
-## 📜 The +Ciclo Motto
-
-**+Ciclo** is an open-source urban transport modeling platform designed to evaluate, refactor, and algorithmically optimize cycleway networks. The framework is structured around three core operational pillars:
-
-```
-               ┌────────────────────────────────────────────────────────┐
-               │                🔍 1. REVIEW                            │
-               │  Baseline Demand Diagnostics & Impedance Mapping       │
-               └───────────────────────────┬────────────────────────────┘
-                                           │
-               ┌───────────────────────────┴────────────────────────────┐
-               │                🛠️ 2. REPAIR                            │
-               │  Topological Refactoring & Manual Project Ingestion    │
-               └───────────────────────────┬────────────────────────────┘
-                                           │
-               ┌───────────────────────────┴────────────────────────────┐
-               │                🤖 3. RECOMMEND                         │
-               │  Generative AI Growth & Network Component Stitching    │
-               └────────────────────────────────────────────────────────┘
-```
+<img width="1340" height="932" alt="image" src="https://github.com/user-attachments/assets/ae2e3c28-5899-45f1-b1fb-cbf733237b47" />
 
 ---
 
