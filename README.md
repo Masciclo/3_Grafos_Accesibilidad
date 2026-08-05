@@ -9,9 +9,6 @@
 [![H3 Grid](https://img.shields.io/badge/H3_Discrete_Grid-Res_8%2F9-hexagon)](https://h3geo.org/)
 
 ---
-<img width="1340" height="932" alt="image" src="https://github.com/user-attachments/assets/ae2e3c28-5899-45f1-b1fb-cbf733237b47" />
-
----
 
 ## 🔍 1. REVIEW: Baseline Evaluation & Diagnostics
 
