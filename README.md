@@ -1,6 +1,6 @@
 # 🚴‍♂️ +Ciclo: REVIEW. REPAIR. RECOMMEND.
 
-> **Active Mobility Demand Assignment, Topological Refactoring & Generative Network Design Engine**
+> **A Smarter Way of Planning**
 
 
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -40,7 +40,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ---
 
-## 🛠️ 2. REPAIR: Topological Refactoring & Project Intervention
+## 🛠️ REPAIR: Add projects
 
 Inject hand-drawn or proposed GeoJSON/Shapefile project lines into the street network graph. The refactoring engine automatically:
 * **Amputates** overlapping baseline street edges to prevent artificial capacity duplication ($80\%$ buffer overlap).
@@ -62,7 +62,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ---
 
-## 🤖 3. RECOMMEND: Generative Network Design Engine
+## 🤖 RECOMMEND: Get ideas of how you could repair your network
 
 Automatically generate high-utility cycleway expansion corridors under budget constraints. Powered by **Group Centrality Maximization** and **Batch Uniform Sampling (BUS)**, the engine:
 * Ranks disconnected cycleway clusters by physical size.
