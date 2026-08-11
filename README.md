@@ -2,7 +2,6 @@
 
 > **Observe network bikeabilities, plan projects and measure the changes.**
 
-
 [![Documentation](https://img.shields.io/badge/Documentation-Online_Manual-blue.svg)](https://masciclo.github.io/3_Grafos_Accesibilidad/)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker_Compose-Active-brightgreen)](docker-compose.yml)
@@ -11,56 +10,14 @@
 [![H3 Grid](https://img.shields.io/badge/H3_Discrete_Grid-Res_8%2F9-hexagon)](https://h3geo.org/)
 
 ---
+
 📖 **Read the full methodology and findings in our [Official White Paper](https://drive.google.com/file/d/1j642zYba9TTjiMBhoMNBMaKaOIiPZvg8/view?usp=sharing).**
 
-<<<<<<< HEAD
-## 📖 Interactive Software Manual (GitHub Pages)
-
-The full interactive scientific and architectural documentation is available online via **GitHub Pages**:
-
-👉 **[+Ciclo Engine Interactive Manual](https://masciclo.github.io/3_Grafos_Accesibilidad/)**
-
-### Key Manual Modules
-
-* 📐 **[1. Conceptual Logic & Commands](https://masciclo.github.io/3_Grafos_Accesibilidad/01-system-design.html)**: Decoupled Python orchestration, 3-column stage handshake table, and scenario execution flags.
-* 🏗️ **[2. Logical Architecture & Repository Mapping](https://masciclo.github.io/3_Grafos_Accesibilidad/01b-logical-architecture.html)**: Layered DDD pattern UML view and exhaustive directory tree.
-* ⚡ **[3. Sequential Execution Logic](https://masciclo.github.io/3_Grafos_Accesibilidad/01c-sequential-execution-logic.html)**: Setup & Ingestion, Network Refactoring, and Shortest Path Batch Routing pipeline phases.
-* 📊 **[Performance & Telemetry](https://masciclo.github.io/3_Grafos_Accesibilidad/02-performance-telemetry.html)**: Big-O complexity matrix, hardware hashing, and interactive Plotly empirical Log-Log regression curve.
-* 📚 **[Bibliography & Licensing](https://masciclo.github.io/3_Grafos_Accesibilidad/05-bibliography-licensing.html)**: Spatial library functional mapping, utility stack, academic references, and open-source licenses.
+📘 **Explore the full interactive software architecture, data lineage, and telemetry benchmarks in our [Software Architecture Manual](https://masciclo.github.io/3_Grafos_Accesibilidad/).**
 
 ---
 
-## 📜 The +Ciclo Motto
-
-**+Ciclo** is an open-source urban transport modeling platform designed to evaluate, refactor, and algorithmically optimize cycleway networks. The framework is structured around three core operational pillars:
-
-```
-               ┌────────────────────────────────────────────────────────┐
-               │                🔍 1. REVIEW                            │
-               │  Baseline Demand Diagnostics & Impedance Mapping       │
-               └───────────────────────────┬────────────────────────────┘
-                                           │
-               ┌───────────────────────────┴────────────────────────────┐
-               │                🛠️ 2. REPAIR                            │
-               │  Topological Refactoring & Manual Project Ingestion    │
-               └───────────────────────────┬────────────────────────────┘
-                                           │
-               ┌───────────────────────────┴────────────────────────────┐
-               │                🤖 3. RECOMMEND                         │
-               │  Generative AI Growth & Network Component Stitching    │
-               └────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🔍 1. REVIEW: Baseline Evaluation & Diagnostics
-
-Evaluate existing street network conditions, compute OD-weighted betweenness centrality, and isolate major traffic barriers before investing capital.
-
-### ⚡ Quickstart & Installation Guide
-=======
-## ⚡ Quickstart & Installation Guide
->>>>>>> 0235139e2b16b2ad4a116e78be10886e5f9355ac
+## ⚡ Installation Guide
 
 #### Prerequisites
 * [Docker Desktop](https://www.docker.com/products/docker-desktop/) (with Docker Compose)
@@ -77,7 +34,12 @@ cd 3_Grafos_Accesibilidad
 docker compose up -d --build
 ```
 
-#### Step 3: Run Baseline Review for Any City
+---
+
+## 🔍 REVIEW: Run Baseline Review for Any City
+
+Evaluate baseline active mobility accessibility, compute OD-weighted betweenness centrality, and isolate major traffic barriers across urban street hierarchies before investing capital.
+
 ```bash
 docker compose run --rm ciclo-py python main.py \
   --location valdivia \
@@ -132,31 +94,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ---
 
-## 🏗️ 4. System Architecture & Methodology
-
-```
-┌─────────────────────────┐    ┌─────────────────────────┐    ┌─────────────────────────┐
-│     OSM Road Network    │    │   INE Census Parquet    │    │  OD Travel Demand MDB   │
-└────────────┬────────────┘    └────────────┬────────────┘    └────────────┬────────────┘
-             │                              │                              │
-             └──────────────────────┬───────┴──────────────────────────────┘
-                                    ▼
-                     ┌─────────────────────────────┐
-                     │ H3 Disaggregation (Res 8/9) │
-                     └──────────────┬──────────────┘
-                                    ▼
-                     ┌─────────────────────────────┐
-                     │   PostGIS + pgRouting A*    │
-                     └──────────────┬──────────────┘
-                                    ▼
-                     ┌─────────────────────────────┐
-                     │ Interactive Maps & Typst    │
-                     └──────────────┬──────────────┘
-```
-
----
-
-## 🎛️ 4. CLI Flags Reference Guide
+## 🎛️ CLI Flags Reference Guide
 
 | Flag | Category | Default | Description |
 | :--- | :---: | :---: | :--- |
@@ -173,7 +111,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ---
 
-## 🎓 5. Academic Citation & License
+## 🎓 Academic Citation & License
 
 If you use **+Ciclo** in your academic research, thesis, or urban planning work, please cite:
 
