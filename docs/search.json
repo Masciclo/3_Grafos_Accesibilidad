@@ -1,0 +1,232 @@
+[
+  {
+    "objectID": "05-bibliography-licensing.html",
+    "href": "05-bibliography-licensing.html",
+    "title": "Bibliography & Licensing",
+    "section": "",
+    "text": "The +Ciclo Engine relies on a specialized stack of spatial and mathematical libraries. Each function is mapped to a specific internal module to ensure maintenance locality.\n\n\n\n\n\n\n\n\n\nLibrary\nKey Functions\nInternal Module\nRole in Simulation\n\n\n\n\nGDAL/OGR\nogr2ogr\ninfra/ingestion.py\nHigh-performance C-level streaming of metropolitan datasets.\n\n\nPandas\ngroupby(), merge()\ncore/demand_synthesizer.py\nCalculation of gravitational weights for disaggregation.\n\n\nGeoPandas\nto_crs(), sjoin()\ninfra/ingestion.py, core/routing.py\nCoordinate alignment and KNN snapping of demand to graph.\n\n\nOSMnx\ngraph_from_place()\ninfra/ingestion.py\nAutomated retrieval of topological road networks from OSM.\n\n\nH3 (Uber)\npolyfill(), h3_to_coords()\ncore/demand_synthesizer.py\nHexagonal hierarchical indexing for demand disaggregation.\n\n\nShapely\nST_Split, ST_Snap\ncore/network_refactor.py\nVirtual geometric operations (mimicking PostGIS behavior).\n\n\nFiona\nfiona.open()\ninfra/ingestion.py\nMetadata peaking to avoid OOM crashes on large GeoJSONs.\n\n\nPsycopg2\ncursor.execute()\ninfra/database.py\nLow-level execution of the SQL Spatial Adapters.\n\n\nSQLAlchemy\ncreate_engine()\ninfra/database.py\nConnection pooling and standardized table synthesis.\n\n\nScikit-Learn\nLinearRegression()\ncore/telemetry.py\nFitting machine-specific Log-Log complexity models.\n\n\nPlotly\ngraph_objects, express\ncore/academic_maps.py\nGeneration of interactive, sigma-filtered analytical maps.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Bibliography & Licensing"
+    ]
+  },
+  {
+    "objectID": "05-bibliography-licensing.html#i.-external-libraries-functional-mapping",
+    "href": "05-bibliography-licensing.html#i.-external-libraries-functional-mapping",
+    "title": "Bibliography & Licensing",
+    "section": "",
+    "text": "The +Ciclo Engine relies on a specialized stack of spatial and mathematical libraries. Each function is mapped to a specific internal module to ensure maintenance locality.\n\n\n\n\n\n\n\n\n\nLibrary\nKey Functions\nInternal Module\nRole in Simulation\n\n\n\n\nGDAL/OGR\nogr2ogr\ninfra/ingestion.py\nHigh-performance C-level streaming of metropolitan datasets.\n\n\nPandas\ngroupby(), merge()\ncore/demand_synthesizer.py\nCalculation of gravitational weights for disaggregation.\n\n\nGeoPandas\nto_crs(), sjoin()\ninfra/ingestion.py, core/routing.py\nCoordinate alignment and KNN snapping of demand to graph.\n\n\nOSMnx\ngraph_from_place()\ninfra/ingestion.py\nAutomated retrieval of topological road networks from OSM.\n\n\nH3 (Uber)\npolyfill(), h3_to_coords()\ncore/demand_synthesizer.py\nHexagonal hierarchical indexing for demand disaggregation.\n\n\nShapely\nST_Split, ST_Snap\ncore/network_refactor.py\nVirtual geometric operations (mimicking PostGIS behavior).\n\n\nFiona\nfiona.open()\ninfra/ingestion.py\nMetadata peaking to avoid OOM crashes on large GeoJSONs.\n\n\nPsycopg2\ncursor.execute()\ninfra/database.py\nLow-level execution of the SQL Spatial Adapters.\n\n\nSQLAlchemy\ncreate_engine()\ninfra/database.py\nConnection pooling and standardized table synthesis.\n\n\nScikit-Learn\nLinearRegression()\ncore/telemetry.py\nFitting machine-specific Log-Log complexity models.\n\n\nPlotly\ngraph_objects, express\ncore/academic_maps.py\nGeneration of interactive, sigma-filtered analytical maps.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Bibliography & Licensing"
+    ]
+  },
+  {
+    "objectID": "05-bibliography-licensing.html#ii.-utility-observability-stack",
+    "href": "05-bibliography-licensing.html#ii.-utility-observability-stack",
+    "title": "Bibliography & Licensing",
+    "section": "II. Utility & Observability Stack",
+    "text": "II. Utility & Observability Stack\n\n\n\n\n\n\n\n\nLibrary\nRole\nUsage\n\n\n\n\nRich\nInterface\nPowers terminal dashboard, progress bars, and animations.\n\n\nPsutil\nTelemetry\nReal-time monitoring of RAM footprint and multi-core utilization.\n\n\nMapclassify\nStatistics\nBinning of PUI metrics into the Emerald Z-Score scale.\n\n\nPython-Dotenv\nConfig\nManagement of DB credentials and machine-specific H3 resolutions.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Bibliography & Licensing"
+    ]
+  },
+  {
+    "objectID": "05-bibliography-licensing.html#iii.-licensing-scientific-traceability",
+    "href": "05-bibliography-licensing.html#iii.-licensing-scientific-traceability",
+    "title": "Bibliography & Licensing",
+    "section": "III. Licensing & Scientific Traceability",
+    "text": "III. Licensing & Scientific Traceability\n\n\n\n\n\n\n\n\nComponent\nLicense Type\nScientific Role\n\n\n\n\nPostgreSQL/PostGIS\nPostgreSQL License\nHigh-fidelity object-relational spatial storage.\n\n\npgRouting\nGPLv2\nCore implementation of A* and Betweenness algorithms.\n\n\nOpenStreetMap\nODbL\nSource of truth for urban topology.\n\n\nInstitutional Data\nAcademic (Restricted)\nEOD (SECTRA) and Census (INE) used under research protocols.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Bibliography & Licensing"
+    ]
+  },
+  {
+    "objectID": "05-bibliography-licensing.html#iv.-academic-references",
+    "href": "05-bibliography-licensing.html#iv.-academic-references",
+    "title": "Bibliography & Licensing",
+    "section": "IV. Academic References",
+    "text": "IV. Academic References\n\nHurtubia, R., Billikopf, S., Abé, I., Schuwirth, J., Larraín, H., & Raveau, S. (2023). CICLO-P: Una herramienta para la simulación de la demanda y la planificación de la infraestructura ciclista. 21º Congreso Chileno de Ingeniería de Transporte.\nMedya, S., Silva, A., Singh, A., Basu, P., & Swami, A. (2018). Group Centrality Maximization via Network Design. Proceedings of the 2018 SIAM International Conference on Data Mining (SDM), 126-134.\nElalouf, A., Adany, R., & Ceder, A. (2012). Flow Expansion on Transportation Networks with Budget Constraints. Procedia - Social and Behavioral Sciences, 54, 1168-1175.\nWysling, L., & Purves, R. S. (2022). Where to improve cycling infrastructure? Assessing bicycle suitability and bikeability with open data in the city of Paris. Transportation Research Interdisciplinary Perspectives, 15, 100648.\nPucher, J., & Buehler, R. (2017). Cycling towards a more sustainable transport future. Transport Reviews, 37(6), 689-694.\nCROW (2007). Design manual for bicycle traffic. CROW, Ede, The Netherlands.\nAhmed, T., Pirdavani, A., Wets, G., & Janssens, D. (2024). Bicycle Infrastructure Design Principles in Urban Bikeability Indices: A Systematic Review. Sustainability, 16(6), 2545.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Bibliography & Licensing"
+    ]
+  },
+  {
+    "objectID": "01c-sequential-execution-logic.html",
+    "href": "01c-sequential-execution-logic.html",
+    "title": "Sequential Execution Logic & Pipeline Phases",
+    "section": "",
+    "text": "The simulation follows a strict hierarchical handover between Python orchestration and specialized SQL adapters across three core operational phases.",
+    "crumbs": [
+      "System Design & Workflow",
+      "3. Sequential Execution Logic"
+    ]
+  },
+  {
+    "objectID": "01c-sequential-execution-logic.html#i.-setup-ingestion-demand-synthesis",
+    "href": "01c-sequential-execution-logic.html#i.-setup-ingestion-demand-synthesis",
+    "title": "Sequential Execution Logic & Pipeline Phases",
+    "section": "I. Setup, Ingestion & Demand Synthesis",
+    "text": "I. Setup, Ingestion & Demand Synthesis\n\nArchetype Initialization (Docker Boot)\nBefore any simulation, db/Dockerfile builds the spatial environment, executing initialization scripts in db/init-queries/ to enable PostGIS/pgRouting extensions and compile custom C routing functions (pgr_betweenness).\n\n\n\n\n\n\nFigure 1: Archetype Initialization (Docker Boot)\n\n\n\n\n\n\n\n\n\n\n\nStage\nOutput Type\nDescription\n\n\n\n\nDockerfile\nDocker Container\nBuilds isolated spatial database container with pgRouting support.\n\n\ndb/init-queries/*.sql\nC-SQL Function\nCompiles custom C routing functions directly into Postgres engine runtime.\n\n\n\n\n\n\nAutonomous Synthesis (Module 0)\nTriggered by DataProvider.satisfy_demand_matrix(), this phase converts macro mobility survey data into spatial micro-flows via area-proportional overlay and gravitational weighting.\n\n\n\n\n\n\nFigure 2: Autonomous Synthesis (Module 0)\n\n\n\n\n\n\n\n\n\n\n\nStage\nOutput Type\nDescription\n\n\n\n\nH3 Extraction\nGeoDataFrame\nPolyfills macro zones into Uber H3 resolution-9 hexagonal grid.\n\n\nPopulation Overlay\nGeoDataFrame\nArea-proportional spatial interpolation of national census population into H3 cells.\n\n\nDemand Disaggregation\nCSV\nDisaggregates coarse zone-to-zone surveys into node-to-node micro-flows (od_matrix_micro.csv).\n\n\n\n\n\n\nIngestion & Invariant Guard\nStreams raw data into PostGIS, establishing mathematical commensurability via automated reprojection and enforcing schema invariants to prevent downstream routing crashes.\n\n\n\n\n\n\nFigure 3: Ingestion & Invariant Guard\n\n\n\n\n\n\n\n\n\n\n\nStage\nOutput Type\nDescription\n\n\n\n\nogr2ogr Stream\nPGTable\nFast C-level streaming of raw geometries into PostGIS with auto-reprojection.\n\n\nSchemaGuard\nPGTable\nAsserts primary keys, column types, and coordinate reference system (SRID) parity.\n\n\n\n\nStructural Invariant Hard-Stops (SchemaGuard)\n\n\n\n\n\n\n\n\n\nFailure Code\nGuard Type\nTrigger Condition\nScientific / Pipeline Consequence\n\n\n\n\nHYGIENIC_VIOLATION\nIngestion\nMissing Origin, Destination, or Population data in sources.\nCauses 100% flow bias; execution halts immediately.\n\n\nSPATIAL_MISMATCH\nAnchoring\nBounding box (BBOX) does not overlap with city study area.\nProduces invalid spatial context; ingestion is rejected.\n\n\nSCHEMA_INCONSISTENCY\nInvariant\nDatabase table lacks mandatory columns (source, target, length).\nThrows adapter crash; requires schema re-mapping.",
+    "crumbs": [
+      "System Design & Workflow",
+      "3. Sequential Execution Logic"
+    ]
+  },
+  {
+    "objectID": "01c-sequential-execution-logic.html#ii.-network-refactoring-topology",
+    "href": "01c-sequential-execution-logic.html#ii.-network-refactoring-topology",
+    "title": "Sequential Execution Logic & Pipeline Phases",
+    "section": "II. Network Refactoring & Topology",
+    "text": "II. Network Refactoring & Topology\nOrchestrated by core/network_refactor.py, this phase implements the polymorphic RefactorStrategy seam to handle different scenario topologies: - Equal Topology Scenarios (V0/V1 baseline): Uses TrivialIdentityStrategy to bypass spatial modifications. - Manual Drawing Scenarios: Uses AssimilativeRefactorStrategy to execute overlap amputation, bridge assimilation, and endpoint snapping. - Algorithmic Discovery Scenarios: Uses RecommendationStrategy to inject recommended corridors into Stage 2 SQL unions.\n\n\n\n\n\n\nFigure 4: Topology Refactoring & Intermodal Merging\n\n\n\n\n\n\n\n\n\n\n\nStage\nOutput Type\nDescription\n\n\n\n\ncreate_assimilation_buffers.sql\nPGTable\nCreates spatial buffer zones (ref_snap_dist) around proposed projects to identify redundant street overlaps.\n\n\nDELETE SQL\nList[int]\nIdentifies baseline edge IDs underlying proposed corridors for surgical amputation.\n\n\nsnap_and_shatter_projects.sql\nPGTable\nWelds project line endpoints to street nodes (ST_Snap), preserving topological planar connectivity.",
+    "crumbs": [
+      "System Design & Workflow",
+      "3. Sequential Execution Logic"
+    ]
+  },
+  {
+    "objectID": "01c-sequential-execution-logic.html#iii.-shortest-path-routing-analytical-audit",
+    "href": "01c-sequential-execution-logic.html#iii.-shortest-path-routing-analytical-audit",
+    "title": "Sequential Execution Logic & Pipeline Phases",
+    "section": "III. Shortest Path Routing & Analytical Audit",
+    "text": "III. Shortest Path Routing & Analytical Audit\n\nBatch Shortest Path Routing\nExecutes batch shortest path routing using pgr_dijkstra or pgr_astar. Origin-destination travel demands are chunked by 500 origin nodes to optimize PostGIS memory usage and database query throughput.\n\n\n\nH3 Aggregation, Analytical Closing & Audit\nMaps flows between scenarios via Parent Lineage Distance matching and generates interactive Plotly HTML maps filtered by Standard Deviation (\\(\\sigma\\)) noise.\n\n\n\n\n\n\nFigure 5: H3 Aggregation & Closing Audit\n\n\n\n\n\n\n\n\n\n\n\nStage\nOutput Type\nDescription\n\n\n\n\ncalculate_delta_flow.sql\nPGTable\nMaps flow inheritance between scenarios based on parent edge IDs and spatial overlap.\n\n\nacademic_maps.py (Traces)\nGeoDataFrame\nGenerates Plotly interactive spatial map traces filtered by standard deviation (\\(\\sigma\\)).\n\n\nacademic_maps.py (Metrics)\nDict\nCalculates social efficiency metrics (PCR, CF, PUI) for embedded dashboard cards.",
+    "crumbs": [
+      "System Design & Workflow",
+      "3. Sequential Execution Logic"
+    ]
+  },
+  {
+    "objectID": "01-system-design.html",
+    "href": "01-system-design.html",
+    "title": "System Design & Workflow",
+    "section": "",
+    "text": "The engine follows a Layered Domain-Driven Design, utilizing a Deep Pipeline pattern to decouple orchestration from spatial logic.\n\n\n\n\n\n\nFigure 1: Logical Architecture (UML View)",
+    "crumbs": [
+      "System Design & Workflow",
+      "1. Conceptual Logic & Commands"
+    ]
+  },
+  {
+    "objectID": "01-system-design.html#i.-logical-architecture-uml-view",
+    "href": "01-system-design.html#i.-logical-architecture-uml-view",
+    "title": "System Design & Workflow",
+    "section": "",
+    "text": "The engine follows a Layered Domain-Driven Design, utilizing a Deep Pipeline pattern to decouple orchestration from spatial logic.\n\n\n\n\n\n\nFigure 1: Logical Architecture (UML View)",
+    "crumbs": [
+      "System Design & Workflow",
+      "1. Conceptual Logic & Commands"
+    ]
+  },
+  {
+    "objectID": "01-system-design.html#ii.-diagram-1-data-lineage-handover-table",
+    "href": "01-system-design.html#ii.-diagram-1-data-lineage-handover-table",
+    "title": "System Design & Workflow",
+    "section": "II. Diagram 1 Data Lineage & Handover Table",
+    "text": "II. Diagram 1 Data Lineage & Handover Table\nThe engine tracks execution progress through discrete operational stages and state containers:\n\n\n\n\n\n\n\n\nStage\nOutput Type\nDescription\n\n\n\n\nconfig\nScenarioConfig\nParses command flags and acts as the Single Source of Truth for simulation arguments.\n\n\nScenarioEngine.execute()\nScenarioEngine\nInstantiates ScenarioContext (shared DB connection pool and runtime state) and ScenarioPipeline (sequential task assembly line).\n\n\nStage Tasks\nPipelineTask\nRegisters and executes pipeline stages sequentially using shared ScenarioContext.\n\n\nosm_raw, ciclo_raw\nPGTable\nStreams raw GeoJSON street and cycleway datasets directly into PostGIS (IngestionTask).\n\n\nvertices_pgr\nPGTable\nSynthesizes topological street graph vertices via pgr_createTopology (TopologyTask).\n\n\nh3_index\nGeoDataFrame\nPolyfills metropolitan macro zones into Uber H3 resolution-9 hexagonal spatial grid (GridExtractionTask).\n\n\nsnapped_h3\nPGTable\nSnaps H3 centroids to street graph vertices using KNN spatial queries (H3SnappingTask).\n\n\nsovereign_v2_net\nPGTable\nExecutes overlap amputation, bridge assimilation, and endpoint snapping (RefactorTask).\n\n\nfull_network\nPGTable\nMerges baseline network with custom project layers and cost surface weights (IntermodalMergingTask).\n\n\nrouted_flows\nPGTable\nRuns server-side batch A* shortest path routing chunked by 500 origin nodes (RoutingTask).\n\n\nh3_flow_grid\nPGTable\nAggregates edge travel flows back to H3 spatial grid cells (AggregationTask).\n\n\ndelta_network, HTML Report\nPGTable, HTMLFile\nCalculates flow inheritance (\\(\\Delta F\\)), PCR/PUI metrics, and renders interactive Plotly report (ClosingAuditTask).",
+    "crumbs": [
+      "System Design & Workflow",
+      "1. Conceptual Logic & Commands"
+    ]
+  },
+  {
+    "objectID": "01-system-design.html#iii.-scenario-archetypes-intervention-evaluation",
+    "href": "01-system-design.html#iii.-scenario-archetypes-intervention-evaluation",
+    "title": "System Design & Workflow",
+    "section": "III. Scenario Archetypes & Intervention Evaluation",
+    "text": "III. Scenario Archetypes & Intervention Evaluation\nThe engine’s analytical power resides in comparing different states of the same spatial network. These states are governed by specific Archetypes that define network behavior:\n\n\n\n\n\n\n\n\n\nArchetype\nAnalytical Goal\nCore Parameter Invariants\nPrimary SQL Scenario Query\n\n\n\n\nBaseline (V0)\nTheoretical Potential\nAll imp_weights = 1.0; inhibit = 0.\ncreate_full_network.sql (No subtraction)\n\n\nCurrent (V1)\nExisting Barrier Effect\nInstitutional Weights; inhibit = 1.\ncreate_inhibited_network.sql (Subtraction)\n\n\nProject (V2)\nImpact Delta (\\(\\Delta\\))\nGeoJSON Injection; reference_scenario set.\ncalculate_delta_flow.sql (2-Layer Handshake)\n\n\n\n\n\n\n\n\n\nFigure 2: Flow maps across Baseline (V0), Current (V1), and Project (V2) scenario archetypes.\n\n\n\nScenario Execution & Evaluation Commands\nCLI commands to execute each scenario archetype and evaluate spatial metrics:\n# Step 1: Run Baseline Scenario (Theoretical Potential, no barrier costs)\n./plus-ciclo.sh --location=valdivia --scenario_id=baseline --imp_primary=1 --imp_secondary=1 --imp_tertiary=1 --imp_local=1 --imp_bike=1 --yes --mapping\n\n# Step 2: Run Current State Scenario (Existing Situation under institutional safety impedance)\n./plus-ciclo.sh --location=valdivia --scenario_id=current --imp_primary=15 --imp_secondary=7 --imp_tertiary=3 --imp_local=1.5 --imp_bike=0.5 --yes --mapping\n\n# Step 3: Run Project Scenario (Evaluates Impact Delta against Current baseline)\n./plus-ciclo.sh --location=valdivia --scenario_id=project_v1 --projects_input=data/valdivia/raw/projects/project_1.geojson --reference_scenario=current --ref_snap_dist=5.0 --parent_lineage_dist=7.0 --project_influence_dist=25.0 --imp_primary=15 --imp_secondary=7 --imp_tertiary=3 --imp_local=1.5 --imp_bike=0.5 --yes --mapping",
+    "crumbs": [
+      "System Design & Workflow",
+      "1. Conceptual Logic & Commands"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "+Ciclo Engine Manual",
+    "section": "",
+    "text": "1. Conceptual Logic & Commands\n\nDomain Conceptual Logic: Decoupled Python orchestration and PostGIS spatial engine.\nData Lineage Table: 3-column stage output and description handshake.\nScenario Archetypes: Baseline (V0), Current (V1), and Project (V2) execution commands.\n\n\n\n2. Logical Architecture & Repository Tree\n\nLayered DDD Pattern: Eraser UML view of execution seam, context, and tasks.\nRepository Mapping: Directory tree structure (grafos-accesibilidad/) and core folder roles.\n\n\n\n3. Sequential Execution Logic\n\nSetup & Ingestion: Docker boot initialization, H3 demand synthesis, and SchemaGuard hard-stops.\nTopology Refactoring: Planar shattering, bridge assimilation, and endpoint snapping (ST_Snap).\nRouting & Audit: Batch A* shortest path routing, \\(\\Delta F\\) flow cascade, and Plotly maps.\n\n\n\nPerformance & Telemetry\n\nComplexity Matrix: Time-complexity analysis across all 9 pipeline tasks.\nTelemetry Architecture: Hardware MD5 hashing and execution timing logs.\nEmpirical Benchmarks: Interactive Plotly Log-Log regression model curve.\n\n\n\nBibliography & Licensing\n\nExternal Libraries: Spatial and mathematical library functional mapping.\nObservability Stack: Rich dashboard, memory profiling, and environment settings.\nAcademic References: Formal citations and open-source licensing specifications.",
+    "crumbs": [
+      "📘 Documentation Home"
+    ]
+  },
+  {
+    "objectID": "01b-logical-architecture.html",
+    "href": "01b-logical-architecture.html",
+    "title": "Logical Architecture & Repository Mapping",
+    "section": "",
+    "text": "The engine follows a Layered Domain-Driven Design, utilizing a Deep Pipeline pattern to decouple orchestration from spatial logic.\n\n\n\n\n\n\nFigure 1: Logical Architecture (UML View)",
+    "crumbs": [
+      "System Design & Workflow",
+      "2. Logical Architecture & Repository Tree"
+    ]
+  },
+  {
+    "objectID": "01b-logical-architecture.html#i.-logical-architecture-uml-view",
+    "href": "01b-logical-architecture.html#i.-logical-architecture-uml-view",
+    "title": "Logical Architecture & Repository Mapping",
+    "section": "",
+    "text": "The engine follows a Layered Domain-Driven Design, utilizing a Deep Pipeline pattern to decouple orchestration from spatial logic.\n\n\n\n\n\n\nFigure 1: Logical Architecture (UML View)",
+    "crumbs": [
+      "System Design & Workflow",
+      "2. Logical Architecture & Repository Tree"
+    ]
+  },
+  {
+    "objectID": "01b-logical-architecture.html#ii.-exhaustive-repository-mapping",
+    "href": "01b-logical-architecture.html#ii.-exhaustive-repository-mapping",
+    "title": "Logical Architecture & Repository Mapping",
+    "section": "II. Exhaustive Repository Mapping",
+    "text": "II. Exhaustive Repository Mapping\ngrafos-accesibilidad/\n├── api/                    # Application Source (Python & SQL)\n│   ├── app/\n│   │   ├── core/           # Brain: Orchestration, Synthesis, and Math transformations.\n│   │   │   ├── pipeline.py # Seam: Context and Pipeline Task interfaces.\n│   │   │   ├── tasks.py    # Adapters: PipelineTask implementations.\n│   │   │   ├── scenario.py # Orchestrator: Declarative pipeline engine.\n│   │   ├── infra/          # Foundation: Ingestion, Schema Guard, and Metadata.\n│   │   ├── sql/common/     # Adapters: High-perf PostGIS scripts (Shatter, Routing, Delta).\n│   │   ├── ui/             # Interface: Rich-based terminal dashboard and assets.\n│   │   ├── main.py         # Seam: CLI entry point and interactive loop.\n│   │   └── __init__.py     # Package marker.\n│   └── tests/              # Verification: Unit tests for spatial and scaling logic.\n├── db/\n│   ├── init-queries/       # Archetype: Extensions and custom pgRouting functions.\n│   └── Dockerfile          # Container: Custom PostGIS/pgRouting image definition.\n├── data/\n│   ├── shared/             # Locality: Multi-country datasets (e.g., Census Parquets).\n│   ├── telemetry/          # Performance: Machine-specific Log-Log models and run logs.\n│   └── [city_name]/        # Workspace: Encapsulated city data (raw, proc, out).\n├── docker-compose.yml      # Orchestration: Multi-container environment definition.\n└── README.md               # Entry Point: Project overview and setup instructions.",
+    "crumbs": [
+      "System Design & Workflow",
+      "2. Logical Architecture & Repository Tree"
+    ]
+  },
+  {
+    "objectID": "02-performance-telemetry.html",
+    "href": "02-performance-telemetry.html",
+    "title": "Performance & Telemetry",
+    "section": "",
+    "text": "The engine’s total runtime complexity is bounded by dominant spatial and graph-theoretic operations across the 9 stages:\n\n\n\n\n\n\n\n\n\nPipeline Stage\nDominant Operation\nMathematical Complexity\nOptimization Strategy\n\n\n\n\nIngestion (S1)\nStreaming I/O\n\\(\\mathcal{O}(E)\\)\nDirect C-level DB streaming via ogr2ogr.\n\n\nTopology (S2)\nR-Tree & GIST Index\n\\(\\mathcal{O}(E \\log E)\\)\nPre-flight GIST indexing and ANALYZE.\n\n\nRefactoring (S5)\nSpatial Intersect\n\\(\\mathcal{O}(E \\log B)\\)\nLocalized buffer unions (ST_Subdivide).\n\n\nRouting (S7)\nBatch A* Shortest Paths\n\\(\\mathcal{O}(D \\times V \\log V)\\)\nServer-side batching & 500-origin chunking.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Performance & Telemetry"
+    ]
+  },
+  {
+    "objectID": "02-performance-telemetry.html#i.-algorithmic-complexity-matrix",
+    "href": "02-performance-telemetry.html#i.-algorithmic-complexity-matrix",
+    "title": "Performance & Telemetry",
+    "section": "",
+    "text": "The engine’s total runtime complexity is bounded by dominant spatial and graph-theoretic operations across the 9 stages:\n\n\n\n\n\n\n\n\n\nPipeline Stage\nDominant Operation\nMathematical Complexity\nOptimization Strategy\n\n\n\n\nIngestion (S1)\nStreaming I/O\n\\(\\mathcal{O}(E)\\)\nDirect C-level DB streaming via ogr2ogr.\n\n\nTopology (S2)\nR-Tree & GIST Index\n\\(\\mathcal{O}(E \\log E)\\)\nPre-flight GIST indexing and ANALYZE.\n\n\nRefactoring (S5)\nSpatial Intersect\n\\(\\mathcal{O}(E \\log B)\\)\nLocalized buffer unions (ST_Subdivide).\n\n\nRouting (S7)\nBatch A* Shortest Paths\n\\(\\mathcal{O}(D \\times V \\log V)\\)\nServer-side batching & 500-origin chunking.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Performance & Telemetry"
+    ]
+  },
+  {
+    "objectID": "02-performance-telemetry.html#ii.-telemetry-architecture-telemetrymanager",
+    "href": "02-performance-telemetry.html#ii.-telemetry-architecture-telemetrymanager",
+    "title": "Performance & Telemetry",
+    "section": "II. Telemetry Architecture (TelemetryManager)",
+    "text": "II. Telemetry Architecture (TelemetryManager)\nExecution metrics are managed by the static telemetry_manager instance.\n\nHardware Hash Generation\nTo decouple machine hardware differences, the engine generates an 8-character MD5 hash combining host identity and CPU core count:\n\\[\\text{machine\\_hash} = \\text{MD5}(\\text{hostname} + \\text{cpu\\_count})[:8]\\]\n\n\nTelemetry Log Dataset (telemetry_log.csv)\nAt the conclusion of each simulation run, log_run() appends a structured record to data/telemetry/telemetry_log.csv:\n\ntimestamp: Epoch run timestamp.\nmachine_hash: Unique 8-character hardware identifier.\nosm_bytes: Input OSM file size in bytes.\nod_rows: Total origin-destination trip rows in micro-matrix.\nhas_projects: Binary flag (1 if project injected, 0 otherwise).\nsrid: EPSG metric projection code.\nt_total, t_ingestion, t_topo, t_grid, t_refactor, t_routing, t_agg, t_final: Measured execution timings (seconds) across individual stages.",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Performance & Telemetry"
+    ]
+  },
+  {
+    "objectID": "02-performance-telemetry.html#iii.-predictive-performance-model-dynamic-eta",
+    "href": "02-performance-telemetry.html#iii.-predictive-performance-model-dynamic-eta",
+    "title": "Performance & Telemetry",
+    "section": "III. Predictive Performance Model & Dynamic ETA",
+    "text": "III. Predictive Performance Model & Dynamic ETA\nTo provide realistic progress ETAs on the terminal dashboard, TelemetryManager trains machine-specific non-linear regression models.\n\nLog-Log Regression Formulation\nWhen \\(\\ge 3\\) historical runs exist for a specific machine_hash, train_model() fits a scikit-learn LinearRegression model using a Log-Log feature transformation:\n\\[\\log(1 + \\text{Time}_{\\text{stage}}) = \\beta_0 + \\beta_1 \\log(1 + \\text{osm\\_bytes}) + \\beta_2 \\log(1 + \\text{od\\_rows}) + \\beta_3 \\text{has\\_projects} + \\epsilon\\]\n\n\nEmpirical Benchmarks & Adjusted Regression Curve\nThe interactive Plotly chart below displays empirical simulation run times plotted against network edge count (\\(E\\)), overlaid with the calibrated Log-Log adjusted regression model:",
+    "crumbs": [
+      "Optimisation & Reference",
+      "Performance & Telemetry"
+    ]
+  }
+]

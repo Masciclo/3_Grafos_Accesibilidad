@@ -2,11 +2,28 @@
 
 > **Active Mobility Demand Assignment, Topological Refactoring & Generative Network Design Engine**
 
+[![Documentation](https://img.shields.io/badge/Documentation-Online_Manual-blue.svg)](https://masciclo.github.io/3_Grafos_Accesibilidad/)
 [![Apache 2.0 License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docker Compose](https://img.shields.io/badge/Docker_Compose-Active-brightgreen)](docker-compose.yml)
 [![PostGIS](https://img.shields.io/badge/PostGIS-3.3+-blue)](https://postgis.net/)
 [![pgRouting](https://img.shields.io/badge/pgRouting-3.5+-orange)](https://pgrouting.org/)
 [![H3 Grid](https://img.shields.io/badge/H3_Discrete_Grid-Res_8%2F9-hexagon)](https://h3geo.org/)
+
+---
+
+## 📖 Interactive Software Manual (GitHub Pages)
+
+The full interactive scientific and architectural documentation is available online via **GitHub Pages**:
+
+👉 **[+Ciclo Engine Interactive Manual](https://masciclo.github.io/3_Grafos_Accesibilidad/)**
+
+### Key Manual Modules
+
+* 📐 **[1. Conceptual Logic & Commands](https://masciclo.github.io/3_Grafos_Accesibilidad/01-system-design.html)**: Decoupled Python orchestration, 3-column stage handshake table, and scenario execution flags.
+* 🏗️ **[2. Logical Architecture & Repository Mapping](https://masciclo.github.io/3_Grafos_Accesibilidad/01b-logical-architecture.html)**: Layered DDD pattern UML view and exhaustive directory tree.
+* ⚡ **[3. Sequential Execution Logic](https://masciclo.github.io/3_Grafos_Accesibilidad/01c-sequential-execution-logic.html)**: Setup & Ingestion, Network Refactoring, and Shortest Path Batch Routing pipeline phases.
+* 📊 **[Performance & Telemetry](https://masciclo.github.io/3_Grafos_Accesibilidad/02-performance-telemetry.html)**: Big-O complexity matrix, hardware hashing, and interactive Plotly empirical Log-Log regression curve.
+* 📚 **[Bibliography & Licensing](https://masciclo.github.io/3_Grafos_Accesibilidad/05-bibliography-licensing.html)**: Spatial library functional mapping, utility stack, academic references, and open-source licenses.
 
 ---
 
@@ -45,8 +62,8 @@ Evaluate existing street network conditions, compute OD-weighted betweenness cen
 
 #### Step 1: Clone Repository
 ```bash
-git clone https://github.com/Masciclo/grafos-accesibilidad.git
-cd grafos-accesibilidad
+git clone https://github.com/Masciclo/3_Grafos_Accesibilidad.git
+cd 3_Grafos_Accesibilidad
 ```
 
 #### Step 2: Launch Database & App Containers
