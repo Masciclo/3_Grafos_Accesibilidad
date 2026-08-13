@@ -53,7 +53,7 @@ docker compose run --rm ciclo-py python main.py \
   --scenario_id baseline \
   --yes
 ```
-*Outputs interactive Plotly HTML maps in `data/valdivia/out/maps/`.*
+*Outputs interactive Plotly HTML maps in `data/valdivia/out/maps/` folder.*
 
 ---
 
