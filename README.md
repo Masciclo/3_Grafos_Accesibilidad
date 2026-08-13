@@ -1,6 +1,6 @@
-<img width="1520" height="706" alt="image" src="https://github.com/user-attachments/assets/92efaa51-f690-4ce2-8f14-c5579342b8ba" />
-<img width="50%" alt="image" src="https://github.com/user-attachments/assets/92efaa51-f690-4ce2-8f14-c5579342b8ba" />
-
+<div align="center">
+  <img width="50%" alt="image" src="https://github.com/user-attachments/assets/92efaa51-f690-4ce2-8f14-c5579342b8ba" />
+</div>
 # 🚴‍♂️ REVIEW. REPAIR. RECOMMEND.
 
 > **Observe network bikeabilities, plan projects and measure the changes.**
