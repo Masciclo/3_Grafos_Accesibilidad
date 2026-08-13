@@ -84,7 +84,8 @@ docker compose run --rm ciclo-py python main.py \
 
 ## 🤖 RECOMMEND: Get ideas of how you could repair your network
 
-<img width="75%" alt="image" src="https://github.com/user-attachments/assets/76ede78f-fa61-4786-9fbb-2ecada6b7e01" />
+<img width="75%" alt="image" src="https://github.com/user-attachments/assets/cb461253-759e-4b33-b9df-8e106de014b8" />
+
 
 
 Automatically generate high-utility cycleway expansion corridors under budget constraints:
