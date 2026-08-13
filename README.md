@@ -17,7 +17,7 @@
 
 📖 **Read the full methodology and findings in our [Official White Paper](https://drive.google.com/file/d/1pBt2uLmcNdQW_OAoi_NBmAh3aZXC5hHT/view?usp=sharing).**
 
-📘 **Explore the full interactive software architecture, data lineage, and telemetry benchmarks in our [Software Architecture Manual](https://masciclo.github.io/3_Grafos_Accesibilidad/).**
+📘 **Explore the [Software Architecture Manual](https://masciclo.github.io/3_Grafos_Accesibilidad/).**
 
 ---
 
