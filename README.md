@@ -1,5 +1,5 @@
 <img width="1520" height="706" alt="image" src="https://github.com/user-attachments/assets/92efaa51-f690-4ce2-8f14-c5579342b8ba" />
-
+<img width="50%" alt="image" src="https://github.com/user-attachments/assets/92efaa51-f690-4ce2-8f14-c5579342b8ba" />
 
 # 🚴‍♂️ REVIEW. REPAIR. RECOMMEND.
 
@@ -41,7 +41,7 @@ docker compose up -d --build
 
 ## 🔍 REVIEW: Run Baseline Review for Any City
 
-<img width="2700" height="1884" alt="image" src="https://github.com/user-attachments/assets/530c3e8b-6e57-49f5-b2c2-8aeb073729d7" />
+<img width="50%" alt="image" src="https://github.com/user-attachments/assets/530c3e8b-6e57-49f5-b2c2-8aeb073729d7" />
 
 
 Evaluate baseline active mobility accessibility, compute OD-weighted betweenness centrality, and isolate major traffic barriers across urban street hierarchies before investing capital.
@@ -58,7 +58,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ## 🛠️ REPAIR: Add projects
 
-<img width="2708" height="1884" alt="image" src="https://github.com/user-attachments/assets/1a337ff8-ea79-4fc3-85d9-32f5f0cbdbd1" />
+<img width="50%" alt="image" src="https://github.com/user-attachments/assets/1a337ff8-ea79-4fc3-85d9-32f5f0cbdbd1" />
 
 
 Inject hand-drawn or proposed GeoJSON/Shapefile project lines into the street network graph. The refactoring engine automatically:
@@ -83,7 +83,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ## 🤖 RECOMMEND: Get ideas of how you could repair your network
 
-<img width="2700" height="1880" alt="image" src="https://github.com/user-attachments/assets/76ede78f-fa61-4786-9fbb-2ecada6b7e01" />
+<img width="50%" alt="image" src="https://github.com/user-attachments/assets/76ede78f-fa61-4786-9fbb-2ecada6b7e01" />
 
 
 Automatically generate high-utility cycleway expansion corridors under budget constraints. Powered by **Group Centrality Maximization** and **Batch Uniform Sampling (BUS)**, the engine:
