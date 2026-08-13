@@ -63,9 +63,9 @@ docker compose run --rm ciclo-py python main.py \
 
 
 Inject hand-drawn or proposed GeoJSON/Shapefile project lines into the street network graph. The refactoring engine automatically:
-* **Amputates** overlapping baseline street edges to prevent artificial capacity duplication ($80\%$ buffer overlap).
+* **Duplication**.
 * **Sutures** project endpoints within a spatial tolerance window.
-* **Tracks Parent Lineage** to map edge IDs between topologically distinct networks.
+* **Tracks Parent Lineage** to map edge IDs between topologically distinct networks scenarios.
 
 ### 🧪 Ingesting & Evaluating Custom Projects
 
