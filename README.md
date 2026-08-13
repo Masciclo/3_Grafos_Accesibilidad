@@ -64,7 +64,7 @@ docker compose run --rm ciclo-py python main.py \
 
 Inject hand-drawn or proposed GeoJSON/Shapefile project lines into the street network graph. The refactoring engine automatically:
 * **Amputates** overlapping baseline street edges to prevent artificial capacity duplication ($80\%$ buffer overlap).
-* **Sutures** project endpoints within a spatial tolerance window (`--manual_digitization_error`).
+* **Sutures** project endpoints within a spatial tolerance window.
 * **Tracks Parent Lineage** to map edge IDs between topologically distinct networks.
 
 ### 🧪 Ingesting & Evaluating Custom Projects
@@ -87,10 +87,9 @@ docker compose run --rm ciclo-py python main.py \
 <img width="75%" alt="image" src="https://github.com/user-attachments/assets/76ede78f-fa61-4786-9fbb-2ecada6b7e01" />
 
 
-Automatically generate high-utility cycleway expansion corridors under budget constraints. Powered by **Group Centrality Maximization** and **Batch Uniform Sampling (BUS)**, the engine:
+Automatically generate high-utility cycleway expansion corridors under budget constraints:
 * Ranks disconnected cycleway clusters by physical size.
-* Executes a budget-constrained greedy Dijkstra growth loop ($1,500\text{ m}$ per corridor).
-* Applies zero-cost bridging links to stitch isolated subnetworks back into the primary urban component.
+* Executes a budget-constrained growth.
 
 ### 💡 Launching AI-Assisted Recommendation Scenarios
 
