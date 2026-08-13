@@ -1,6 +1,6 @@
 
 <div align="center">
-  <img width="50%" alt="image" src="https://github.com/user-attachments/assets/44bd0a89-0c22-4363-ad31-8e144d087d50" />
+  <img width="75%" alt="image" src="https://github.com/user-attachments/assets/44bd0a89-0c22-4363-ad31-8e144d087d50" />
 </div>
 # 🚴‍♂️ REVIEW. REPAIR. RECOMMEND.
 
