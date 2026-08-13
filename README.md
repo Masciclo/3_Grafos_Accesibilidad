@@ -78,7 +78,6 @@ docker compose run --rm ciclo-py python main.py \
   --manual_digitization_error 15 \
   --yes
 ```
-*Generates differential flow maps ($\Delta f$) and $\Delta\sigma$ quantile heatmaps showing traffic diversion away from high-stress avenues.*
 
 ---
 
