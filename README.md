@@ -81,7 +81,7 @@ docker compose run --rm ciclo-py python main.py \
 
 ---
 
-## 🤖 RECOMMEND: Get ideas of how you could repair your network
+## 🤖 RECOMMEND: Get ideas of how you could improve your network
 
 <img width="75%" alt="image" src="https://github.com/user-attachments/assets/cb461253-759e-4b33-b9df-8e106de014b8" />
 
