@@ -383,6 +383,22 @@ class RoutingVisualizer:
                 except Exception as flow_map_err:
                     diagnostic_handler.report("FLOW_PURPOSE_MAPPING_FAILED", "WARNING", f"Failed to generate purpose flow maps: {flow_map_err}")
 
+            # Generate QGIS Styles (.qml) and Layer Definitions (.qlr) package
+            try:
+                from core.academic_maps import AcademicMapGenerator
+                generator = AcademicMapGenerator(output_dir=getattr(reporter.exporter, 'output_dir', f"data/{output_loc}/out/maps"))
+                generator.generate_all_qgis_packages(
+                    scenario_id=scenario_prefix,
+                    network_gdf=net_gdf,
+                    delta_gdf=delta_gdf if delta_exists else None,
+                    city_key=output_loc,
+                    srid=int(config.srid) if hasattr(config, 'srid') and config.srid else 32719,
+                    db_config=db_cfg,
+                    total_trips=total_trips
+                )
+            except Exception as qgis_err:
+                diagnostic_handler.report("QGIS_EXPORT_WARNING", "WARNING", f"QGIS style/layer package generation issue: {qgis_err}")
+
         except Exception as e:
             diagnostic_handler.report("MAPPING_FAILED", "ERROR", f"Mapping failed: {e} | {traceback.format_exc().splitlines()[-1]}")
 

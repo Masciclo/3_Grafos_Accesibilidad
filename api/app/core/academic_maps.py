@@ -4,7 +4,9 @@ import plotly.express as px
 import numpy as np
 import os
 import json
+import uuid
 import geojson
+from typing import Optional, Dict, List, Tuple
 from shapely.geometry import Polygon, MultiPolygon, LineString
 import osmnx as ox
 
@@ -12,12 +14,25 @@ class AcademicMapGenerator:
     '''
     Module to generate publication-ready maps for urban network analysis using Plotly.
     Standards: Fixed Portrait (570x800), Centered HTML, Black Frame, Strict Visual Pruning.
+    Also produces identical QGIS styles (.qml) and layer definitions (.qlr) for GIS workflows.
     '''
     def __init__(self, output_dir="data/maps"):
         self.output_dir = output_dir
         self.context_dir = "data/map_layers"
+        
+        # Derive qgis_dir from output_dir: if output_dir is data/{city}/out/maps, qgis_dir is data/{city}/out/qgis
+        if "/out/maps" in output_dir:
+            self.qgis_dir = output_dir.replace("/out/maps", "/out/qgis")
+        elif output_dir.endswith("/maps"):
+            self.qgis_dir = output_dir[:-5] + "/qgis"
+        elif output_dir.endswith("maps"):
+            self.qgis_dir = output_dir[:-4] + "qgis"
+        else:
+            self.qgis_dir = os.path.join(output_dir, "qgis")
+            
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.context_dir, exist_ok=True)
+        os.makedirs(self.qgis_dir, exist_ok=True)
 
     def _ensure_context_layers(self, city_name, bbox, srid):
         '''
@@ -919,5 +934,525 @@ class AcademicMapGenerator:
         self._write_centered_html(fig, path)
         return path
 
+    # =========================================================================
+    # QGIS STYLES (.qml) & LAYER DEFINITIONS (.qlr) GENERATOR SUITE
+    # Replicates Plotly Academic styling 1:1 for live PostGIS & file layers
+    # =========================================================================
+
+    def _build_qgis_datasource(self, table_name: str, db_config: Optional[dict] = None, srid: int = 32719, sql_filter: str = "") -> str:
+        """
+        Builds standard QGIS PostgreSQL connection string matching stationdb / PostGIS instance.
+        """
+        if db_config is None:
+            db_name = os.getenv('DATABASE_NAME', 'ciclo_dev')
+            host = os.getenv('HOST', 'localhost')
+            port = os.getenv('PORT', '5433')
+            user = os.getenv('DB_USER', 'ciclo')
+            password = os.getenv('DB_PASSWORD', 'ciclo')
+        else:
+            db_name = db_config.get('name', 'ciclo_dev')
+            host = db_config.get('host', 'localhost')
+            port = db_config.get('port', '5433')
+            user = db_config.get('user', 'ciclo')
+            password = db_config.get('password', 'ciclo')
+            
+        sql_clause = f" sql={sql_filter}" if sql_filter else ""
+        return f"dbname='{db_name}' host={host} port={port} user='{user}' password='{password}' sslmode=disable key='edge_id' srid={srid} type=MultiLineString checkPrimaryKeyUnicity='0' table=\"public\".\"{table_name}\" (geometry){sql_clause}"
+
+    def _wrap_qml(self, renderer_xml: str) -> str:
+        """
+        Wraps a renderer-v2 block inside a valid QGIS 3.x .qml layer style file.
+        """
+        return f"""<!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
+<qgis version="3.28.0" styleCategories="AllStyleCategories">
+{renderer_xml}
+  <blendMode>0</blendMode>
+</qgis>
+"""
+
+    def _wrap_qlr(self, layer_id: str, layer_title: str, datasource: str, provider: str, geom_type: str, srid: int, renderer_xml: str) -> str:
+        """
+        Wraps a datasource and renderer block inside a valid QGIS 3.x .qlr layer definition file.
+        """
+        geom_code = "2" if geom_type.lower() in ("polygon", "multipolygon") else "1"
+        escaped_attr_source = datasource.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped_elem_source = datasource.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped_title = layer_title.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+        return f"""<!DOCTYPE qgis-layer-definition>
+<qlr>
+  <layer-tree-group checked="Qt::Checked" name="" expanded="1">
+    <customproperties/>
+    <layer-tree-layer checked="Qt::Checked" id="{layer_id}" name="{escaped_title}" providerKey="{provider}" source="{escaped_attr_source}" expanded="1"/>
+  </layer-tree-group>
+  <maplayers>
+    <maplayer type="vector" geometry="{geom_type}" readOnly="0" autoRefreshTime="0" autoRefreshMode="Disabled">
+      <id>{layer_id}</id>
+      <datasource>{escaped_elem_source}</datasource>
+      <keywordList><value></value></keywordList>
+      <layername>{escaped_title}</layername>
+      <srs>
+        <spatialrefsys nativeFormat="Wkt">
+          <wkt></wkt>
+          <proj4></proj4>
+          <srsid>0</srsid>
+          <srid>{srid}</srid>
+          <authid>EPSG:{srid}</authid>
+          <description>EPSG:{srid}</description>
+          <projectionacronym></projectionacronym>
+          <ellipsoidacronym></ellipsoidacronym>
+          <geographicflag>false</geographicflag>
+        </spatialrefsys>
+      </srs>
+{renderer_xml}
+      <blendMode>0</blendMode>
+      <layerGeometryType>{geom_code}</layerGeometryType>
+    </maplayer>
+  </maplayers>
+</qlr>
+"""
+
+    def generate_qgis_impedance_style(self, scenario_id: str, db_config: Optional[dict] = None, srid: int = 32719) -> tuple[str, str]:
+        """
+        Generates QGIS .qml style and .qlr layer definition for Road Typology & Impedance surface.
+        Matches Plotly colors: Primary (#e91e63), Secondary (#ff9800), Tertiary (#9c27b0),
+        Residential (#2196f3), Cycleway (#27ae60), Project New (#e67e22).
+        """
+        rules = [
+            ("Primary Road", "\"highway\" = 'primary'", "233,30,99,255", "0.45"),
+            ("Secondary Road", "\"highway\" = 'secondary'", "255,152,0,255", "0.35"),
+            ("Tertiary Road", "\"highway\" = 'tertiary'", "156,39,176,255", "0.28"),
+            ("Residential Street", "\"highway\" = 'residential'", "33,150,243,255", "0.22"),
+            ("Existing Cycleway", "\"highway\" = 'cycleway'", "39,174,96,255", "0.60"),
+            ("New Project (+Ciclo)", "\"highway\" = 'project_new' OR \"is_project\" = TRUE", "230,126,34,255", "0.75")
+        ]
+
+        rules_xml = []
+        symbols_xml = []
+        root_key = f"{{{uuid.uuid4()}}}"
+
+        for idx, (label, filter_expr, color_rgba, width_mm) in enumerate(rules):
+            rule_key = f"{{{uuid.uuid4()}}}"
+            clean_filter = filter_expr.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+            rules_xml.append(f'      <rule key="{rule_key}" filter="{clean_filter}" label="{label}" symbol="{idx}"/>')
+            symbols_xml.append(f"""    <symbol type="line" name="{idx}" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="{color_rgba}"/>
+        <prop k="line_width" v="{width_mm}"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+        renderer_xml = f"""  <renderer-v2 type="RuleRenderer" symbollevels="0">
+    <rules key="{root_key}">
+{chr(10).join(rules_xml)}
+    </rules>
+    <symbols>
+{chr(10).join(symbols_xml)}
+    </symbols>
+  </renderer-v2>"""
+
+        # Write .qml
+        qml_path = os.path.join(self.qgis_dir, f"{scenario_id}_impedance.qml")
+        with open(qml_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qml(renderer_xml))
+
+        # Write .qlr
+        table_name = f"{scenario_id}_network"
+        datasource = self._build_qgis_datasource(table_name, db_config=db_config, srid=srid)
+        qlr_path = os.path.join(self.qgis_dir, f"{scenario_id}_impedance.qlr")
+        layer_id = f"{scenario_id}_impedance_{uuid.uuid4().hex[:8]}"
+        with open(qlr_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qlr(layer_id, f"Road Typology ({scenario_id})", datasource, "postgres", "Line", srid, renderer_xml))
+
+        print(f"   - [QGIS] Impedance style & layer generated: {qml_path} | {qlr_path}")
+        return qml_path, qlr_path
+
+    def generate_qgis_flow_style(self, scenario_id: str, network_gdf: gpd.GeoDataFrame, flow_type: str = "all", db_config: Optional[dict] = None, srid: int = 32719, total_trips: float = 1.0) -> tuple[str, str]:
+        """
+        Generates QGIS .qml style and .qlr layer definition for Routed Flow Distribution.
+        flow_type="all": Graduated YlOrRd 5-quantile renderer with proportional line widths.
+        flow_type="bikelanes": Synchronized 5-quantile Green renderer on cycleways + soft gray background streets.
+        """
+        flow_gdf = network_gdf[network_gdf['od_flow'] > 0] if 'od_flow' in network_gdf.columns else network_gdf
+        if not flow_gdf.empty and 'od_flow' in flow_gdf.columns:
+            quantiles = np.quantile(flow_gdf['od_flow'], [0, 0.5, 0.75, 0.9, 0.97, 1.0])
+        else:
+            quantiles = [0.0, 10.0, 50.0, 150.0, 500.0, 2000.0]
+
+        if flow_type == "bikelanes":
+            # Rule-based renderer for cycleways + background streets
+            green_colors = [
+                ("200,230,201,255"), # #c8e6c9
+                ("129,199,132,255"), # #81c784
+                ("76,175,80,255"),   # #4caf50
+                ("46,125,50,255"),   # #2e7d32
+                ("27,94,32,255")     # #1b5e20
+            ]
+            root_key = f"{{{uuid.uuid4()}}}"
+            rules_xml = []
+            symbols_xml = []
+
+            # Rule 0: Background Streets
+            rules_xml.append(f'      <rule key="{{{uuid.uuid4()}}}" filter="(&quot;original_highway&quot; != \'cycleway\' OR &quot;original_highway&quot; IS NULL) AND (&quot;highway&quot; != \'cycleway\')" label="Background Streets" symbol="0"/>')
+            symbols_xml.append("""    <symbol type="line" name="0" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="220,223,227,255"/>
+        <prop k="line_width" v="0.25"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+            # Rules 1 to 5: Cycleway Flow Quantiles
+            for i in range(5):
+                q_min, q_max = int(quantiles[i]), int(quantiles[i+1])
+                sym_id = i + 1
+                rule_filter = f'(&quot;original_highway&quot; = \'cycleway\' OR &quot;highway&quot; = \'cycleway\') AND &quot;od_flow&quot; &gt;= {q_min} AND &quot;od_flow&quot; &lt;= {q_max}'
+                rules_xml.append(f'      <rule key="{{{uuid.uuid4()}}}" filter="{rule_filter}" label="{q_min} - {q_max} trips" symbol="{sym_id}"/>')
+                symbols_xml.append(f"""    <symbol type="line" name="{sym_id}" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="{green_colors[i]}"/>
+        <prop k="line_width" v="0.85"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+            renderer_xml = f"""  <renderer-v2 type="RuleRenderer" symbollevels="0">
+    <rules key="{root_key}">
+{chr(10).join(rules_xml)}
+    </rules>
+    <symbols>
+{chr(10).join(symbols_xml)}
+    </symbols>
+  </renderer-v2>"""
+            suffix = "flow_bikelanes"
+            layer_title = f"Cycleway Flow ({scenario_id})"
+
+        else:
+            # Graduated Symbol Renderer on od_flow for Full Network (YlOrRd palette)
+            ylorrd_colors = [
+                ("255,255,178,255", "0.35"), # #ffffb2
+                ("254,204,92,255", "0.55"),  # #fecc5c
+                ("253,141,60,255", "0.80"),  # #fd8d3c
+                ("240,59,32,255", "1.10"),   # #f03b20
+                ("189,0,38,255", "1.45")     # #bd0026
+            ]
+            ranges_xml = []
+            symbols_xml = []
+
+            for i in range(5):
+                q_min, q_max = float(quantiles[i]), float(quantiles[i+1])
+                color_rgba, width_mm = ylorrd_colors[i]
+                ranges_xml.append(f'      <range lower="{q_min:.2f}" upper="{q_max:.2f}" symbol="{i}" label="{int(q_min)} - {int(q_max)} trips" render="true"/>')
+                symbols_xml.append(f"""    <symbol type="line" name="{i}" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="{color_rgba}"/>
+        <prop k="line_width" v="{width_mm}"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+            renderer_xml = f"""  <renderer-v2 type="graduatedSymbol" attr="od_flow" symbollevels="0" graduatedMethod="GraduatedColor">
+    <ranges>
+{chr(10).join(ranges_xml)}
+    </ranges>
+    <symbols>
+{chr(10).join(symbols_xml)}
+    </symbols>
+  </renderer-v2>"""
+            suffix = "flow"
+            layer_title = f"Network Flow ({scenario_id})"
+
+        # Write .qml
+        qml_path = os.path.join(self.qgis_dir, f"{scenario_id}_{suffix}.qml")
+        with open(qml_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qml(renderer_xml))
+
+        # Write .qlr
+        table_name = f"{scenario_id}_network"
+        datasource = self._build_qgis_datasource(table_name, db_config=db_config, srid=srid)
+        qlr_path = os.path.join(self.qgis_dir, f"{scenario_id}_{suffix}.qlr")
+        layer_id = f"{scenario_id}_{suffix}_{uuid.uuid4().hex[:8]}"
+        with open(qlr_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qlr(layer_id, layer_title, datasource, "postgres", "Line", srid, renderer_xml))
+
+        print(f"   - [QGIS] Flow style & layer generated ({flow_type}): {qml_path} | {qlr_path}")
+        return qml_path, qlr_path
+
+    def generate_qgis_delta_sigma_style(self, scenario_id: str, delta_gdf: Optional[gpd.GeoDataFrame] = None, db_config: Optional[dict] = None, srid: int = 32719) -> tuple[str, str]:
+        """
+        Generates QGIS .qml style and .qlr layer definition for Change Analysis (Delta Flow Δσ).
+        Implements 9 divergent RdBu rules matching Plotly:
+        4 Reduction levels (Red), No Change (Neutral Gray), 4 Increase levels (Blue).
+        """
+        if delta_gdf is not None and not delta_gdf.empty and 'delta_flow' in delta_gdf.columns:
+            neg = delta_gdf[delta_gdf['delta_flow'] < 0]['delta_flow'].abs()
+            pos = delta_gdf[delta_gdf['delta_flow'] > 0]['delta_flow']
+            q_neg = np.quantile(neg, [0, 0.50, 0.875, 0.975, 1.0]) if not neg.empty else [0, 1, 2, 3, 4]
+            q_pos = np.quantile(pos, [0, 0.50, 0.875, 0.975, 1.0]) if not pos.empty else [0, 1, 2, 3, 4]
+        else:
+            q_neg = [0, 20, 100, 500, 2000]
+            q_pos = [0, 20, 100, 500, 2000]
+
+        classes = [
+            ("Critical Reduction (Top 2.5% Drop)", f"&quot;delta_flow&quot; &lt; -{q_neg[3]:.1f}", "178,24,43,255", "1.40"),      # #b2182b
+            ("Major Reduction (87.5-97.5% Drop)", f"&quot;delta_flow&quot; &gt;= -{q_neg[3]:.1f} AND &quot;delta_flow&quot; &lt; -{q_neg[2]:.1f}", "214,96,77,255", "1.10"),  # #d6604d
+            ("Medium Reduction (50-87.5% Drop)", f"&quot;delta_flow&quot; &gt;= -{q_neg[2]:.1f} AND &quot;delta_flow&quot; &lt; -{q_neg[1]:.1f}", "244,165,130,255", "0.80"), # #f4a582
+            ("Light Reduction (0-50% Drop)", f"&quot;delta_flow&quot; &gt;= -{q_neg[1]:.1f} AND &quot;delta_flow&quot; &lt; 0", "253,219,199,255", "0.50"),       # #fddbc7
+            ("No Change", "&quot;delta_flow&quot; = 0", "224,224,224,255", "0.30"),                                                  # #e0e0e0
+            ("Light Increase (0-50% Gain)", f"&quot;delta_flow&quot; &gt; 0 AND &quot;delta_flow&quot; &lt;= {q_pos[1]:.1f}", "209,229,240,255", "0.50"),        # #d1e5f0
+            ("Medium Increase (50-87.5% Gain)", f"&quot;delta_flow&quot; &gt; {q_pos[1]:.1f} AND &quot;delta_flow&quot; &lt;= {q_pos[2]:.1f}", "146,197,222,255", "0.80"), # #92c5de
+            ("Major Increase (87.5-97.5% Gain)", f"&quot;delta_flow&quot; &gt; {q_pos[2]:.1f} AND &quot;delta_flow&quot; &lt;= {q_pos[3]:.1f}", "67,147,195,255", "1.10"),   # #4393c3
+            ("Critical Peak Increase (Top 2.5% Gain)", f"&quot;delta_flow&quot; &gt; {q_pos[3]:.1f}", "33,102,172,255", "1.40")     # #2166ac
+        ]
+
+        rules_xml = []
+        symbols_xml = []
+        root_key = f"{{{uuid.uuid4()}}}"
+
+        for idx, (label, filter_expr, color_rgba, width_mm) in enumerate(classes):
+            rule_key = f"{{{uuid.uuid4()}}}"
+            rules_xml.append(f'      <rule key="{rule_key}" filter="{filter_expr}" label="{label}" symbol="{idx}"/>')
+            symbols_xml.append(f"""    <symbol type="line" name="{idx}" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="{color_rgba}"/>
+        <prop k="line_width" v="{width_mm}"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+        renderer_xml = f"""  <renderer-v2 type="RuleRenderer" symbollevels="0">
+    <rules key="{root_key}">
+{chr(10).join(rules_xml)}
+    </rules>
+    <symbols>
+{chr(10).join(symbols_xml)}
+    </symbols>
+  </renderer-v2>"""
+
+        # Write .qml
+        qml_path = os.path.join(self.qgis_dir, f"{scenario_id}_delta_sigma.qml")
+        with open(qml_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qml(renderer_xml))
+
+        # Write .qlr
+        table_name = f"{scenario_id}_delta_network"
+        datasource = self._build_qgis_datasource(table_name, db_config=db_config, srid=srid)
+        qlr_path = os.path.join(self.qgis_dir, f"{scenario_id}_delta_sigma.qlr")
+        layer_id = f"{scenario_id}_delta_{uuid.uuid4().hex[:8]}"
+        with open(qlr_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qlr(layer_id, f"Change Analysis Δσ ({scenario_id})", datasource, "postgres", "Line", srid, renderer_xml))
+
+        print(f"   - [QGIS] Delta sigma style & layer generated: {qml_path} | {qlr_path}")
+        return qml_path, qlr_path
+
+    def generate_qgis_project_performance_style(self, scenario_id: str, network_gdf: gpd.GeoDataFrame, db_config: Optional[dict] = None, srid: int = 32719, total_trips: float = 1.0) -> tuple[str, str]:
+        """
+        Generates QGIS .qml style and .qlr layer definition for Segment-wise Project Performance.
+        Shows existing cycleways in blue (#4fa8e3) and project segments in 5 green quantiles.
+        """
+        flow_gdf = network_gdf[network_gdf['od_flow'] > 0] if 'od_flow' in network_gdf.columns else network_gdf
+        if not flow_gdf.empty and 'od_flow' in flow_gdf.columns:
+            quantiles = np.quantile(flow_gdf['od_flow'], [0, 0.5, 0.75, 0.9, 0.97, 1.0])
+        else:
+            quantiles = [0.0, 10.0, 50.0, 150.0, 500.0, 2000.0]
+
+        green_colors = [
+            ("200,230,201,255"), # #c8e6c9
+            ("129,199,132,255"), # #81c784
+            ("76,175,80,255"),   # #4caf50
+            ("46,125,50,255"),   # #2e7d32
+            ("27,94,32,255")     # #1b5e20
+        ]
+        labels = ["Local Use", "Connector Use", "Trunk Use", "Critical Use", "Strategic Artery"]
+
+        root_key = f"{{{uuid.uuid4()}}}"
+        rules_xml = []
+        symbols_xml = []
+
+        # Rule 0: Existing Cycleways (Non-project)
+        rules_xml.append(f'      <rule key="{{{uuid.uuid4()}}}" filter="(&quot;original_highway&quot; = \'cycleway\' OR &quot;highway&quot; = \'cycleway\') AND (&quot;is_project&quot; IS NULL OR &quot;is_project&quot; = FALSE)" label="Existing Cycleway" symbol="0"/>')
+        symbols_xml.append("""    <symbol type="line" name="0" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="79,168,227,255"/>
+        <prop k="line_width" v="0.65"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+        # Rules 1 to 5: Project Segment Performance
+        for i in range(5):
+            q_min, q_max = int(quantiles[i]), int(quantiles[i+1])
+            sym_id = i + 1
+            rule_filter = f'(&quot;is_project&quot; = TRUE OR &quot;project_id&quot; IS NOT NULL) AND &quot;od_flow&quot; &gt;= {q_min} AND &quot;od_flow&quot; &lt;= {q_max}'
+            rules_xml.append(f'      <rule key="{{{uuid.uuid4()}}}" filter="{rule_filter}" label="Project: {labels[i]} ({q_min} - {q_max} trips)" symbol="{sym_id}"/>')
+            symbols_xml.append(f"""    <symbol type="line" name="{sym_id}" alpha="1" clip_to_extent="1" force_rhr="0">
+      <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+        <prop k="line_color" v="{green_colors[i]}"/>
+        <prop k="line_width" v="0.95"/>
+        <prop k="line_width_unit" v="MM"/>
+        <prop k="line_style" v="solid"/>
+        <prop k="joinstyle" v="round"/>
+        <prop k="capstyle" v="round"/>
+      </layer>
+    </symbol>""")
+
+        renderer_xml = f"""  <renderer-v2 type="RuleRenderer" symbollevels="0">
+    <rules key="{root_key}">
+{chr(10).join(rules_xml)}
+    </rules>
+    <symbols>
+{chr(10).join(symbols_xml)}
+    </symbols>
+  </renderer-v2>"""
+
+        # Write .qml
+        qml_path = os.path.join(self.qgis_dir, f"{scenario_id}_project_performance.qml")
+        with open(qml_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qml(renderer_xml))
+
+        # Write .qlr
+        table_name = f"{scenario_id}_network"
+        datasource = self._build_qgis_datasource(table_name, db_config=db_config, srid=srid)
+        qlr_path = os.path.join(self.qgis_dir, f"{scenario_id}_project_performance.qlr")
+        layer_id = f"{scenario_id}_proj_perf_{uuid.uuid4().hex[:8]}"
+        with open(qlr_path, "w", encoding="utf-8") as f:
+            f.write(self._wrap_qlr(layer_id, f"Project Performance ({scenario_id})", datasource, "postgres", "Line", srid, renderer_xml))
+
+        print(f"   - [QGIS] Project performance style & layer generated: {qml_path} | {qlr_path}")
+        return qml_path, qlr_path
+
+    def generate_qgis_context_styles(self, city_key: str, srid: int = 32719, db_config: Optional[dict] = None) -> dict[str, tuple[str, str]]:
+        """
+        Generates QGIS .qml styles and .qlr layer definitions for OSM Context Layers (Water, Forests, Buildings, Limits).
+        """
+        context_defs = {
+            "water": {
+                "title": f"Water Bodies ({city_key.capitalize()})",
+                "geom": "Polygon",
+                "color": "209,217,222,217", # #D1D9DE at ~85% alpha
+                "outline": "180,195,205,255"
+            },
+            "forests": {
+                "title": f"Forests & Green Areas ({city_key.capitalize()})",
+                "geom": "Polygon",
+                "color": "210,219,210,204", # #D2DBD2 at ~80% alpha
+                "outline": "190,205,190,255"
+            },
+            "buildings": {
+                "title": f"Building Footprints ({city_key.capitalize()})",
+                "geom": "Polygon",
+                "color": "235,234,229,230", # #EBEAE5 at ~90% alpha
+                "outline": "215,214,209,255"
+            },
+            "urban_limit": {
+                "title": f"Urban Boundary ({city_key.capitalize()})",
+                "geom": "Line",
+                "color": "192,192,192,255", # #C0C0C0
+                "outline": "192,192,192,255"
+            }
+        }
+
+        results = {}
+        for key, info in context_defs.items():
+            geojson_file = os.path.join(self.context_dir, f"{city_key}_{key}.geojson")
+            
+            if info["geom"] == "Polygon":
+                renderer_xml = f"""  <renderer-v2 type="singleSymbol" symbollevels="0">
+    <symbols>
+      <symbol type="fill" name="0" alpha="1" clip_to_extent="1" force_rhr="0">
+        <layer class="SimpleFill" pass="0" locked="0" enabled="1">
+          <prop k="color" v="{info['color']}"/>
+          <prop k="style" v="solid"/>
+          <prop k="outline_color" v="{info['outline']}"/>
+          <prop k="outline_style" v="solid"/>
+          <prop k="outline_width" v="0.15"/>
+          <prop k="outline_width_unit" v="MM"/>
+        </layer>
+      </symbol>
+    </symbols>
+  </renderer-v2>"""
+            else:
+                renderer_xml = f"""  <renderer-v2 type="singleSymbol" symbollevels="0">
+    <symbols>
+      <symbol type="line" name="0" alpha="1" clip_to_extent="1" force_rhr="0">
+        <layer class="SimpleLine" pass="0" locked="0" enabled="1">
+          <prop k="line_color" v="{info['color']}"/>
+          <prop k="line_width" v="0.35"/>
+          <prop k="line_width_unit" v="MM"/>
+          <prop k="line_style" v="dash"/>
+          <prop k="joinstyle" v="round"/>
+          <prop k="capstyle" v="round"/>
+        </layer>
+      </symbol>
+    </symbols>
+  </renderer-v2>"""
+
+            qml_path = os.path.join(self.qgis_dir, f"{city_key}_{key}.qml")
+            with open(qml_path, "w", encoding="utf-8") as f:
+                f.write(self._wrap_qml(renderer_xml))
+
+            # If geojson file exists, create .qlr pointing to file datasource
+            qlr_path = os.path.join(self.qgis_dir, f"{city_key}_{key}.qlr")
+            layer_id = f"{city_key}_{key}_{uuid.uuid4().hex[:8]}"
+            rel_source = os.path.abspath(geojson_file)
+            with open(qlr_path, "w", encoding="utf-8") as f:
+                f.write(self._wrap_qlr(layer_id, info["title"], rel_source, "ogr", info["geom"], srid, renderer_xml))
+
+            results[key] = (qml_path, qlr_path)
+
+        return results
+
+    def generate_all_qgis_packages(self, scenario_id: str, network_gdf: gpd.GeoDataFrame, delta_gdf: Optional[gpd.GeoDataFrame] = None, city_key: Optional[str] = None, srid: int = 32719, db_config: Optional[dict] = None, total_trips: float = 1.0) -> dict[str, tuple[str, str]]:
+        """
+        Master orchestrator generating the complete QGIS .qml styles and .qlr layer definition package
+        for the active scenario in data/{city}/out/qgis/.
+        """
+        c_key = city_key or scenario_id.split('_')[0]
+        print(f"   - [QGIS Package] Generating QGIS styles and layer definitions for {scenario_id}...")
+
+        pkg = {}
+        # 1. Impedance
+        pkg["impedance"] = self.generate_qgis_impedance_style(scenario_id, db_config=db_config, srid=srid)
+        
+        # 2. Flow (All Network)
+        pkg["flow"] = self.generate_qgis_flow_style(scenario_id, network_gdf, flow_type="all", db_config=db_config, srid=srid, total_trips=total_trips)
+        
+        # 3. Flow (Bikelanes)
+        pkg["flow_bikelanes"] = self.generate_qgis_flow_style(scenario_id, network_gdf, flow_type="bikelanes", db_config=db_config, srid=srid, total_trips=total_trips)
+        
+        # 4. Delta Sigma (if delta exists)
+        if delta_gdf is not None:
+            pkg["delta_sigma"] = self.generate_qgis_delta_sigma_style(scenario_id, delta_gdf, db_config=db_config, srid=srid)
+            
+        # 5. Project Performance (if projects exist)
+        has_proj = ('is_project' in network_gdf.columns and network_gdf['is_project'].any()) or ('project_id' in network_gdf.columns and network_gdf['project_id'].notnull().any())
+        if has_proj:
+            pkg["project_performance"] = self.generate_qgis_project_performance_style(scenario_id, network_gdf, db_config=db_config, srid=srid, total_trips=total_trips)
+            
+        # 6. Context Layers
+        ctx_pkg = self.generate_qgis_context_styles(c_key, srid=srid, db_config=db_config)
+        pkg.update(ctx_pkg)
+
+        print(f"   - [QGIS Package] Successfully generated {len(pkg)} QGIS layer packages in {self.qgis_dir}/")
+        return pkg
+
 if __name__ == "__main__":
-    print("Plotly Academic Map Generator ready.")
+    print("Plotly Academic Map & QGIS Generator ready.")
