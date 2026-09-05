@@ -18,6 +18,7 @@ except (ImportError, AttributeError):
     if not hasattr(h3, 'polyfill'):
         h3.polyfill = lambda poly, res, geo_json_conformant=True: h3.polygon_to_cells(poly, res)
 import json
+import geojson
 from infra.database import create_conn, df_to_postgres, check_table_existence, stream_file_to_postgres
 from infra.metadata import metadata_audit
 from ui.components import diagnostic_handler
