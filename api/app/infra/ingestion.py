@@ -6,6 +6,7 @@ import geopandas as gpd
 import osmnx as ox
 import fiona
 from shapely.geometry import Polygon, shape, box
+from shapely import wkb
 try:
     from h3 import h3
 except (ImportError, AttributeError):
