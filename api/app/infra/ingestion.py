@@ -6,9 +6,16 @@ import geopandas as gpd
 import osmnx as ox
 import fiona
 from shapely.geometry import Polygon, shape, box
-from shapely import wkb
-from h3 import h3
-import geojson
+try:
+    from h3 import h3
+except (ImportError, AttributeError):
+    import h3
+    if not hasattr(h3, 'h3_to_geo'):
+        h3.h3_to_geo = h3.cell_to_latlng
+    if not hasattr(h3, 'h3_to_geo_boundary'):
+        h3.h3_to_geo_boundary = lambda h, geo_json=True: h3.cell_to_boundary(h)
+    if not hasattr(h3, 'polyfill'):
+        h3.polyfill = lambda poly, res, geo_json_conformant=True: h3.polygon_to_cells(poly, res)
 import json
 from infra.database import create_conn, df_to_postgres, check_table_existence, stream_file_to_postgres
 from infra.metadata import metadata_audit
