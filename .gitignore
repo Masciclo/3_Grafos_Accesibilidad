@@ -1,30 +1,69 @@
-# +Ciclo Gitignore
+# +Ciclo Gitignore: Strict Code and Data Separation
 
 # Python & Environment
 __pycache__/
 *.py[cod]
 *$py.class
 .env
+.env.*
+!.env.example
 myenv/
 .venv/
+*/.venv/
 api/app/.env
 
-# Local Resoures (Managed by Docker Volumes)
+# Data & Volumes (Managed by Docker Volumes / Local Storage)
+data/
 data/*
 !data/.gitkeep
+cache/
 cache/*
 !cache/.gitkeep
+api/app/cache/
+api/app/data/
+
+# Heavy Spatial & Database File Formats
+*.parquet
+*.mdb
+*.accdb
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.sbn
+*.sbx
+*.geojson
+*.gpkg
+*.tif
+*.tiff
+
+# Output and Visualization Artifacts
+*.html
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.zip
+*.tar
+*.tar.gz
+*.rar
+out/
+results/
+output/
 
 # IDE & OS
 .vscode/
+.idea/
 .DS_Store
+.DS_Store?
+._*
 .Rhistory
 *.RData
 *.Rproj.user
 
-# Legacy leftovers (already purged)
+# Legacy & Logs
 Version 1/
 sheet_cheat.sh
-api/app/cache/
-api/app/data/
 api/app/test_output.log
+*.log
