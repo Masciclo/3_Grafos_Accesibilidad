@@ -10,12 +10,6 @@ h3==3.*
 geojson==3.*
 tqdm>=4.65.0
 
-# Phase 4: Visualization and Progress Tracking
-tqdm>=4.65.0
-streamlit>=1.24.0
-folium>=0.14.0
-streamlit-folium>=0.13.0
-
 # Phase 4: Observability and Console UI
 rich>=13.0.0
 psutil>=5.9.0
