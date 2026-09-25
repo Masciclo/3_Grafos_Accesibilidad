@@ -133,7 +133,7 @@ If you use **+Ciclo** in your academic research, thesis, or urban planning work,
   title        = {Optimizing Infrastructure Investment using OD-Weighted Centrality},
   school       = {Delft University of Technology (TU Delft)},
   year         = {2026},
-  note         = {GEO 5010 Research Assignment, Supervised by Prof. Giorgio Agugiaro}
+  note         = {GEO 5010 Research Assignment, Supervised by Dr. Giorgio Agugiaro}
 }
 ```
 
