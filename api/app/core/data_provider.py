@@ -37,14 +37,11 @@ class DataProvider:
     def initialize_location_structure(self, city_key: str):
         '''
         Task 13.5: Pre-emptive Folder Ghosting.
-        Creates raw/, proc/, out/ immediately upon city request.
-        Includes projects/, demand, and zones folders for scenario testing.
+        Creates raw/, proc/, out/ immediately upon city request via WorkspaceStorage.
         '''
-        for sub in [
-            'raw', 'raw/projects', f'raw/{city_key}_demand', f'raw/{city_key}_zones', 
-            'proc', 'out/maps', 'out/qgis'
-        ]:
-            os.makedirs(f"data/{city_key}/{sub}", exist_ok=True)
+        from core.workspace_storage import WorkspaceStorage
+        storage = WorkspaceStorage()
+        storage.initialize_city_structure(city_key)
         print(f"   - [Structure] Initialized encapsulated workspace for '{city_key}'.")
 
     def bootstrap_new_city(self, city_key: str) -> Optional[Dict]:

@@ -56,7 +56,9 @@ def main():
     parser.add_argument("--reference_scenario", dest="reference_scenario", type=str)
     parser.add_argument("--yes", dest="force_yes", action="store_true")
     parser.add_argument("--cleanup", dest="cleanup", action="store_true")
-    parser.add_argument("--mapping", dest="mapping", action="store_true", default=True, help="Generate interactive academic map suite.")
+    parser.add_argument("--mapping", dest="mapping", action="store_true", default=True, help="Generate interactive MapLibre vector map suite (default: True).")
+    parser.add_argument("--export-pmtiles", dest="export_pmtiles", action="store_true", default=False, help="Bake standalone offline PMTiles archive via martin-cp.")
+    parser.add_argument("--legacy-plotly", "--legacy-visualization", "--legacy-viz", dest="legacy_plotly", action="store_true", default=False, help="Use legacy Plotly HTML generator instead of MapLibre vector tiles.")
     parser.add_argument("--buffer_size", dest="buffer_size", type=int, default=15)
     parser.add_argument("--ref_snap_dist", dest="ref_snap_dist", type=float, default=5.0, help="Reference Snapping Distance (buffer size to align streets to project)")
     parser.add_argument("--parent_lineage_dist", dest="parent_lineage_dist", type=float, default=7.0, help="Parent Lineage Distance (search radius to map refactored segments back to baseline)")
@@ -301,6 +303,7 @@ def main():
                 imp_local=args.imp_local, imp_bike=args.imp_bike,
                 inhibit=bool(args.inhibit), disinhibit=bool(args.disinhibit),
                 cleanup=args.cleanup, mapping=args.mapping,
+                export_pmtiles=args.export_pmtiles, legacy_plotly=args.legacy_plotly,
                 ref_snap_dist=args.ref_snap_dist,
                 parent_lineage_dist=args.parent_lineage_dist,
                 project_influence_dist=args.manual_digitization_error

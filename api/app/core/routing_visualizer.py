@@ -177,13 +177,66 @@ class RoutingVisualizer:
             engine = create_engine(f'postgresql://{user}:{password}@{host}:{port}/{db}')
             
             output_loc = config.city_key if config.city_key else loc_abbr
+            from core.workspace_storage import WorkspaceStorage
+            storage = WorkspaceStorage()
+            map_out_dir = str(storage.stage_output("maps", city_key=output_loc))
             style_provider = StandardAcademicStyleProvider(font_family="Serif")
-            exporter = LocalHTMLExportAdapter(output_dir=f"data/{output_loc}/out/maps")
-            
-            reporter = AcademicReporter(style_provider, exporter, observer)
+            exporter = LocalHTMLExportAdapter(output_dir=map_out_dir)
             
             final_net_table = f"{scenario_prefix}_network"
-            
+
+            # --- Cartographic Publisher Seam (Primary MapLibre Vector Tile Output) ---
+            if not getattr(config, 'legacy_plotly', False):
+                try:
+                    from core.cartographic_publisher import CartographicPublisher, DatabaseCartographicAdapter
+                    from core.tile_sources import LiveMartinTileSource, PMTilesArchiveTileSource
+
+                    data_adapter = DatabaseCartographicAdapter(engine=engine)
+                    tile_source = (
+                        PMTilesArchiveTileSource(output_dir=map_out_dir)
+                        if getattr(config, 'export_pmtiles', False)
+                        else LiveMartinTileSource()
+                    )
+
+                    publisher = CartographicPublisher(
+                        storage=storage,
+                        data_adapter=data_adapter,
+                        tile_source=tile_source
+                    )
+
+                    ref_prefix = f"{loc_abbr}_{config.reference_scenario}" if getattr(config, 'reference_scenario', None) else None
+                    imp_weights = {
+                        "primary": getattr(config, 'imp_primary', 15.0),
+                        "secondary": getattr(config, 'imp_secondary', 7.0),
+                        "tertiary": getattr(config, 'imp_tertiary', 3.0),
+                        "local": getattr(config, 'imp_local', 1.5),
+                        "bike": getattr(config, 'imp_bike', 0.5)
+                    }
+
+                    artifact = publisher.publish_scenario(
+                        scenario_prefix=scenario_prefix,
+                        city_key=output_loc,
+                        bbox=config.bbox if getattr(config, 'bbox', None) else None,
+                        mode="maplibre",
+                        reference_scenario=ref_prefix,
+                        export_pmtiles=getattr(config, 'export_pmtiles', False),
+                        total_trips=total_trips,
+                        imp_weights=imp_weights,
+                        observer=observer
+                    )
+
+                    for map_type, m_path in artifact.generated_maps.items():
+                        diagnostic_handler.report("MAPLIBRE", "INFO", f"Generated MapLibre {map_type} map: {m_path}")
+
+                except Exception as ml_err:
+                    diagnostic_handler.report("MAPLIBRE_WARNING", "WARNING", f"MapLibre flow generation issue: {ml_err}")
+
+                if observer:
+                    observer.on_progress_update(9, "DONE ✅")
+                return
+
+            # --- Legacy Plotly Flow (Fallback when --legacy-plotly is active) ---
+            reporter = AcademicReporter(style_provider, exporter, observer)
             # Check the size of the network table first to optimize loading on large cities like Santiago
             with engine.connect() as conn:
                 count_res = conn.execute(text(f"SELECT COUNT(*) FROM {final_net_table}")).fetchone()

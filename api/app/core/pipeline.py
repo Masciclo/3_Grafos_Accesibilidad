@@ -37,6 +37,8 @@ class ScenarioConfig:
     disinhibit: bool = True
     cleanup: bool = False
     mapping: bool = True
+    export_pmtiles: bool = False
+    legacy_plotly: bool = False
 
 class ProgressSeam(ABC):
     """

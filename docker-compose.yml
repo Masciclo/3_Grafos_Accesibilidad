@@ -14,6 +14,26 @@ services:
     volumes:
       - stationdb_data:/var/lib/postgresql/data
       - ./db/init-queries:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ciclo -d ciclo_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    restart: unless-stopped
+    ports:
+      - "${MARTIN_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgres://ciclo:ciclo@stationdb:5432/ciclo_dev
+      RUST_LOG: info,martin=warn
+    volumes:
+      - ./data:/app/data
+    command: ["postgres://ciclo:ciclo@stationdb:5432/ciclo_dev", "/app/data"]
+    depends_on:
+      stationdb:
+        condition: service_healthy
 
   ciclo-py:
     build:
@@ -43,6 +63,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on: 
       - stationdb
+      - martin
 
 volumes:
   stationdb_data:

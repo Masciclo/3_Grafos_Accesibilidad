@@ -24,6 +24,8 @@ class PipelineUI:
         
         # --- Task 13.9: Conditional Phase Registration ---
         is_comparison = bool(getattr(args, "reference_scenario", None) or getattr(args, "projects_input", None))
+        is_legacy = bool(getattr(args, "legacy_plotly", False))
+        mapping_name = "Academic Mapping (Legacy Plotly)" if is_legacy else "Academic Mapping (MapLibre Vector Tiles)"
         
         all_phases = [
             {"id": 1, "name": "Data Ingestion", "steps": 4},
@@ -34,7 +36,7 @@ class PipelineUI:
             {"id": 6, "name": "Intermodal Merging", "steps": 1, "optional": True},
             {"id": 7, "name": "Demand Routing", "steps": 100}, # Origins-based
             {"id": 8, "name": "H3 Aggregation", "steps": 6},
-            {"id": 9, "name": "Analytical Closing & Audit", "steps": 2}
+            {"id": 9, "name": mapping_name, "steps": 2}
         ]
         
         self.phases = [p for p in all_phases if not p.get("optional") or is_comparison]
@@ -87,17 +89,43 @@ class PipelineUI:
         return f"{int(seconds // 60)}m {int(seconds % 60)}s"
 
     def make_config_table(self):
-        table = Table(title="[bold white]Pipeline Configuration", border_style="white", box=None)
-        table.add_column("Parameter", style="bold white")
-        table.add_column("Value", style="white")
+        table = Table(box=None, expand=True)
+        table.add_column("Parameter", style="bold white", width=24)
+        table.add_column("Configured Setting", style="white")
         if self.args:
-            table.add_row("Location", self.location)
-            table.add_row("Scenario", getattr(self.args, "scenario_id", "v1"))
-            table.add_row("SRID", str(self.srid))
+            table.add_row("Location", str(self.location))
+            table.add_row("Scenario ID", str(getattr(self.args, "scenario_id", "v1")))
+            table.add_row("Target SRID", str(self.srid))
             
-            # Use getattr for optional/new flags to prevent crashes
-            inhibit_status = "Enabled" if getattr(self.args, "inhibit", True) else "Disabled"
-            table.add_row("Inhibition", inhibit_status)
+            # Mapping Engine Specification
+            if not getattr(self.args, "mapping", True):
+                engine_str = "[bold red]Disabled[/]"
+            elif getattr(self.args, "legacy_plotly", False):
+                engine_str = "[bold yellow]Legacy Plotly (Monolithic HTML)[/]"
+            else:
+                engine_str = "[bold green]MapLibre GL JS (Live Martin Vector Tiles @ :3000)[/]"
+            table.add_row("Mapping Engine", engine_str)
+
+            # PMTiles Export
+            pmtiles_str = "[bold green]Enabled (martin-cp bake)[/]" if getattr(self.args, "export_pmtiles", False) else "[dim]Disabled[/]"
+            table.add_row("PMTiles Archive", pmtiles_str)
+
+            # Reference / Comparison
+            ref_scen = getattr(self.args, "reference_scenario", None)
+            table.add_row("Reference Scenario", str(ref_scen) if ref_scen else "[dim]None (Single Scenario)[/]")
+            
+            # Projects input
+            proj_in = getattr(self.args, "projects_input", None)
+            if proj_in:
+                table.add_row("Projects Input", str(os.path.basename(proj_in)))
+
+            # Inhibition & Impedance
+            inhibit_status = "[green]Active[/]" if getattr(self.args, "inhibit", True) else "[dim]Bypassed[/]"
+            table.add_row("Hazard Inhibition", inhibit_status)
+            
+            bike_imp = getattr(self.args, "imp_bike", 0.5)
+            prim_imp = getattr(self.args, "imp_primary", 15.0)
+            table.add_row("Impedance (Bike/Motorway)", f"{bike_imp}x / {prim_imp}x")
         return table
 
     def get_landing_layout(self, prompt_text=None):
@@ -142,7 +170,8 @@ class PipelineUI:
         controls = "[bold green][C] Launch Analysis[/] | [bold yellow][R] Redefine Parameters[/] | [bold red][Ctrl+C] Abort[/]"
         
         return Group(
-            Panel(f"[bold white]SCREEN 2: Pre-flight Audit Monitoring[/] [dim]Area: {self.location} | Scenario: {getattr(self.args, 'scenario_id', 'v1')}[/]", border_style="white"),
+            Panel(f"[bold white]SCREEN 2: Pre-flight Audit & Pipeline Configuration[/] [dim]Area: {self.location} | Scenario: {getattr(self.args, 'scenario_id', 'v1')}[/]", border_style="white"),
+            Panel(self.make_config_table(), title="[bold white]Pipeline & Mapping Configuration", border_style="cyan"),
             Group(
                 Panel(meta_table, title="[bold white]Metadata Standardization", border_style="white"),
                 Panel(budget_table, title="[bold white]Estimated Phase Budget", border_style="white")
