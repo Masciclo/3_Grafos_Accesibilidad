@@ -76,8 +76,8 @@ BEGIN
             FROM %I t, bounds b
             WHERE t.geometry && b.geom_native
               AND (
-                  ($2 < 10 AND (t.highway IN (''motorway'', ''trunk'', ''primary'', ''secondary'', ''tertiary'', ''cycleway'', ''residential'') OR t.is_project = TRUE OR t.od_flow > 0))
-                  OR ($2 >= 10)
+                  ($2 < 13 AND (t.highway IN (''motorway'', ''trunk'', ''primary'', ''secondary'', ''tertiary'', ''cycleway'') OR t.is_project = TRUE OR t.od_flow > 0))
+                  OR ($2 >= 13)
               )
         )
         SELECT ST_AsMVT(tile, ''network'', 4096, ''geom'')
@@ -157,8 +157,8 @@ BEGIN
             FROM %I d, bounds b
             WHERE d.geometry && b.geom_native
               AND (
-                  ($2 < 10 AND (ABS(d.delta_flow) > 0 OR d.is_project = TRUE))
-                  OR ($2 >= 10)
+                  ($2 < 13 AND (ABS(d.delta_flow) > 0 OR d.is_project = TRUE))
+                  OR ($2 >= 13)
               )
         )
         SELECT ST_AsMVT(tile, ''delta'', 4096, ''geom'')

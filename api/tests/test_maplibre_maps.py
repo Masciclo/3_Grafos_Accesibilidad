@@ -256,3 +256,41 @@ def test_maplibre_generator_h3_purpose_html():
         assert "trips_work" in h3_content
         assert "purpose-select" in h3_content
         assert "mvt_h3" in h3_content
+
+def test_maplibre_generator_progressive_lod(tmp_path):
+    generator = MapLibreMapGenerator(output_dir=str(tmp_path))
+    bbox = [-70.7, -33.5, -70.6, -33.4]
+    html_path = generator.generate_flow_map(
+        scenario_prefix="santchil_baseline",
+        bbox=bbox,
+        total_trips=100.0,
+        max_flow=500.0,
+        p50_flow=50.0,
+        city_key="santiago"
+    )
+    assert os.path.exists(html_path)
+    with open(html_path, "r", encoding="utf-8") as f:
+        flow_content = f.read()
+
+    # Verify public viewer contains zoom LoD progressive transitions:
+    # 1. Opacity stops for background streets: 12 -> 0.0, 13 -> 0.15, 15 -> 0.40
+    assert "12, 0.0" in flow_content
+    assert "13, 0.15" in flow_content
+    assert "15, 0.4" in flow_content
+    # 2. Width stops for background streets: 12 -> 0.0, 13 -> 0.3, 15 -> 0.8
+    assert "13, [\"case\"" in flow_content or "13, ['case'" in flow_content
+    assert "15, [\"case\"" in flow_content or "15, ['case'" in flow_content
+
+    # Also test delta map public generation
+    delta_path = generator.generate_delta_map(
+        scenario_prefix="santchil_baseline",
+        bbox=bbox,
+        max_delta=250.0,
+        city_key="santiago"
+    )
+    assert os.path.exists(delta_path)
+    with open(delta_path, "r", encoding="utf-8") as f:
+        delta_content = f.read()
+
+    assert "13, 0.15" in delta_content or "13,0.15" in delta_content
+    assert "15, 0.4" in delta_content or "15,0.4" in delta_content

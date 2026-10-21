@@ -348,19 +348,29 @@ function selectFlowLayerPaint(state, config = {}) {
       ["+", 0.6, ["*", ["min", 1.0, ["/", ["to-number", ["get", "od_flow"]], maxFlow]], 1.8]],
       ["in", ["get", "highway"], ["literal", ["motorway", "trunk"]]], 0.8,
       ["in", ["get", "highway"], ["literal", ["primary", "secondary"]]], 0.5,
+      0.0
+    ],
+    12, [
+      "case",
+      ["==", ["get", "highway"], "cycleway"], 2.4,
+      [">", ["to-number", ["get", "od_flow"]], 0],
+      ["+", 1.0, ["*", ["min", 1.0, ["/", ["to-number", ["get", "od_flow"]], maxFlow]], 4.0]],
+      ["in", ["get", "highway"], ["literal", ["motorway", "trunk"]]], 1.6,
+      ["in", ["get", "highway"], ["literal", ["primary", "secondary"]]], 1.0,
+      ["==", ["get", "highway"], "tertiary"], 0.7,
+      0.0
+    ],
+    13, [
+      "case",
+      ["==", ["get", "highway"], "cycleway"], 2.8,
+      [">", ["to-number", ["get", "od_flow"]], 0],
+      ["+", 1.2, ["*", ["min", 1.0, ["/", ["to-number", ["get", "od_flow"]], maxFlow]], 4.5]],
+      ["in", ["get", "highway"], ["literal", ["motorway", "trunk"]]], 1.9,
+      ["in", ["get", "highway"], ["literal", ["primary", "secondary"]]], 1.3,
+      ["==", ["get", "highway"], "tertiary"], 0.9,
       0.3
     ],
-    11, [
-      "case",
-      ["==", ["get", "highway"], "cycleway"], 2.2,
-      [">", ["to-number", ["get", "od_flow"]], 0],
-      ["+", 0.9, ["*", ["min", 1.0, ["/", ["to-number", ["get", "od_flow"]], maxFlow]], 3.5]],
-      ["in", ["get", "highway"], ["literal", ["motorway", "trunk"]]], 1.4,
-      ["in", ["get", "highway"], ["literal", ["primary", "secondary"]]], 0.9,
-      ["==", ["get", "highway"], "tertiary"], 0.6,
-      0.4
-    ],
-    14, [
+    15, [
       "case",
       ["==", ["get", "highway"], "cycleway"], 3.8,
       [">", ["to-number", ["get", "od_flow"]], 0],
@@ -375,13 +385,18 @@ function selectFlowLayerPaint(state, config = {}) {
   const lineOpacityExpr = [
     "case",
     ["==", ["get", "is_project"], true], 1.0,
+    [">", ["to-number", ["get", "od_flow"]], 0], 0.95,
     [
       "any",
       ["==", ["get", "highway"], "cycleway"],
       ["==", ["get", "original_highway"], "cycleway"]
-    ], 0.95,
-    [">", ["to-number", ["get", "od_flow"]], 0], 0.90,
-    0.45 // Demoted background context
+    ], 0.85,
+    [
+      "interpolate", ["linear"], ["zoom"],
+      12, 0.0,
+      13, 0.15,
+      15, 0.40
+    ]
   ];
 
   return {

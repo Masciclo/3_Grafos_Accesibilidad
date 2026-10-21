@@ -142,6 +142,19 @@ console.log("Running Headless Tests for ciclo_map_reducer.js...\n");
   assert.ok(widthJson.includes("od_flow"), "od_flow missing in line-width");
   assert.ok(widthJson.includes("500"), "maxFlow missing in line-width divisor");
 
+  // Verify progressive opacity fade stops (12: 0.0, 13: 0.15, 15: 0.40)
+  const opacityJson = JSON.stringify(paint["line-opacity"]);
+  assert.ok(opacityJson.includes("interpolate"), "Interpolation missing in line-opacity");
+  assert.ok(opacityJson.includes("0.15"), "Opacity stop 0.15 missing at zoom 13");
+  assert.ok(opacityJson.includes("0.4"), "Opacity stop 0.40 missing at zoom 15");
+  assert.ok(opacityJson.includes("0.95"), "Flow edge opacity 0.95 missing");
+  assert.ok(opacityJson.includes("0.85"), "Cycleway opacity 0.85 missing");
+
+  // Verify width interpolation for background streets (12: 0.0, 13: 0.3, 15: 0.8)
+  assert.ok(widthJson.includes("12"), "Zoom stop 12 missing in line-width");
+  assert.ok(widthJson.includes("13"), "Zoom stop 13 missing in line-width");
+  assert.ok(widthJson.includes("15"), "Zoom stop 15 missing in line-width");
+
   console.log("✔ Test 5 Passed: Flow layer MapLibre paint expressions with flow-scaled width");
 }
 

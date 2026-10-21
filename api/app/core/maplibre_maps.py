@@ -12,6 +12,21 @@ class MapLibreMapGenerator:
     """
     _cached_reducer_script: Optional[str] = None
 
+    BACKGROUND_ZOOM_OPACITY = [
+        'interpolate', ['linear'], ['zoom'],
+        12, 0.0,
+        13, 0.15,
+        15, 0.40
+    ]
+    BACKGROUND_ZOOM_OPACITY_FAINT = [
+        'interpolate', ['linear'], ['zoom'],
+        12, 0.0,
+        13, 0.10,
+        15, 0.25
+    ]
+    MAJOR_HIGHWAY_LIST = ['motorway', 'trunk', 'primary', 'secondary', 'tertiary']
+    MAJOR_HIGHWAYS_FILTER = ['in', ['get', 'highway'], ['literal', MAJOR_HIGHWAY_LIST]]
+
     def __init__(self, output_dir: str = "data/maps", tile_source: Optional[TileSourceAdapter] = None):
         self.output_dir = output_dir
         self.tile_source = tile_source or LiveMartinTileSource()
@@ -66,8 +81,8 @@ class MapLibreMapGenerator:
             }
         ]
 
-    @staticmethod
-    def _get_flow_line_paint(q1: int, q2: int, q3: int, q4: int, q5: int, max_flow: float) -> Dict[str, Any]:
+    @classmethod
+    def _get_flow_line_paint(cls, q1: int, q2: int, q3: int, q4: int, q5: int, max_flow: float) -> Dict[str, Any]:
         return {
             'line-color': [
                 'case',
@@ -110,19 +125,29 @@ class MapLibreMapGenerator:
                     ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 1.4,
                     ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 0.8,
                     ['in', ['get', 'highway'], ['literal', ['primary', 'secondary']]], 0.5,
-                    0.3
+                    0.0
                 ],
-                11, [
+                12, [
                     'case',
                     ['>', ['to-number', ['get', 'od_flow']], 0],
                     ['+', 1.2, ['*', ['min', 1.0, ['/', ['to-number', ['get', 'od_flow']], float(max_flow)]], 4.0]],
-                    ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 2.2,
-                    ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.4,
-                    ['in', ['get', 'highway'], ['literal', ['primary', 'secondary']]], 0.9,
-                    ['==', ['get', 'highway'], 'tertiary'], 0.6,
-                    0.4
+                    ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 2.4,
+                    ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.6,
+                    ['in', ['get', 'highway'], ['literal', ['primary', 'secondary']]], 1.0,
+                    ['==', ['get', 'highway'], 'tertiary'], 0.7,
+                    0.0
                 ],
-                14, [
+                13, [
+                    'case',
+                    ['>', ['to-number', ['get', 'od_flow']], 0],
+                    ['+', 1.5, ['*', ['min', 1.0, ['/', ['to-number', ['get', 'od_flow']], float(max_flow)]], 5.0]],
+                    ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 2.8,
+                    ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.9,
+                    ['in', ['get', 'highway'], ['literal', ['primary', 'secondary']]], 1.3,
+                    ['==', ['get', 'highway'], 'tertiary'], 0.9,
+                    0.3
+                ],
+                15, [
                     'case',
                     ['>', ['to-number', ['get', 'od_flow']], 0],
                     ['+', 1.8, ['*', ['min', 1.0, ['/', ['to-number', ['get', 'od_flow']], float(max_flow)]], 6.5]],
@@ -138,7 +163,7 @@ class MapLibreMapGenerator:
                 ['>', ['to-number', ['get', 'od_flow']], 0], 0.95,
                 ['==', ['get', 'is_project'], True], 1.0,
                 ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 0.85,
-                0.35
+                cls.BACKGROUND_ZOOM_OPACITY
             ]
         }
 
@@ -385,14 +410,16 @@ class MapLibreMapGenerator:
                 ],
                 'line-width': [
                     'interpolate', ['linear'], ['zoom'],
-                    8, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 1.8, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 0.8, 0.3],
-                    11, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 3.0, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.4, 0.5],
-                    14, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 4.5, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 2.2, 0.8]
+                    8, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 1.8, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 0.8, 0.0],
+                    12, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 3.0, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.4, 0.0],
+                    13, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 3.5, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.8, 0.3],
+                    15, ['case', ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 4.5, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 2.2, 0.8]
                 ],
                 'line-opacity': [
                     'case',
                     ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 0.95,
-                    0.25
+                    self.MAJOR_HIGHWAYS_FILTER, 0.35,
+                    self.BACKGROUND_ZOOM_OPACITY_FAINT
                 ]
             }
         })
@@ -556,15 +583,17 @@ class MapLibreMapGenerator:
                 ],
                 'line-width': [
                     'interpolate', ['linear'], ['zoom'],
-                    8, ['case', ['==', ['get', 'is_project'], True], 2.2, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 1.4, 0.3],
-                    11, ['case', ['==', ['get', 'is_project'], True], 3.5, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 2.0, 0.5],
-                    14, ['case', ['==', ['get', 'is_project'], True], 5.0, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 3.0, 0.8]
+                    8, ['case', ['==', ['get', 'is_project'], True], 2.2, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 1.4, 0.0],
+                    12, ['case', ['==', ['get', 'is_project'], True], 3.5, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 2.0, 0.0],
+                    13, ['case', ['==', ['get', 'is_project'], True], 4.2, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 2.5, 0.3],
+                    15, ['case', ['==', ['get', 'is_project'], True], 5.0, ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 3.0, 0.8]
                 ],
                 'line-opacity': [
                     'case',
                     ['==', ['get', 'is_project'], True], 1.0,
                     ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 0.85,
-                    0.25
+                    self.MAJOR_HIGHWAYS_FILTER, 0.35,
+                    self.BACKGROUND_ZOOM_OPACITY_FAINT
                 ]
             }
         })
@@ -921,11 +950,17 @@ class MapLibreMapGenerator:
                 ],
                 'line-width': [
                     'interpolate', ['linear'], ['zoom'],
-                    8, ['case', ['==', ['get', 'highway'], 'cycleway'], 1.2, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 0.8, 0.4],
-                    11, ['case', ['==', ['get', 'highway'], 'cycleway'], 2.0, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.4, 0.6],
-                    14, ['case', ['==', ['get', 'highway'], 'cycleway'], 3.2, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 2.2, 0.9]
+                    8, ['case', ['==', ['get', 'highway'], 'cycleway'], 1.2, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 0.8, 0.0],
+                    12, ['case', ['==', ['get', 'highway'], 'cycleway'], 2.0, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.4, 0.0],
+                    13, ['case', ['==', ['get', 'highway'], 'cycleway'], 2.6, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 1.8, 0.3],
+                    15, ['case', ['==', ['get', 'highway'], 'cycleway'], 3.2, ['in', ['get', 'highway'], ['literal', ['motorway', 'trunk']]], 2.2, 0.8]
                 ],
-                'line-opacity': 0.60
+                'line-opacity': [
+                    'case',
+                    ['any', ['==', ['get', 'highway'], 'cycleway'], ['==', ['get', 'original_highway'], 'cycleway']], 0.85,
+                    self.MAJOR_HIGHWAYS_FILTER, 0.45,
+                    self.BACKGROUND_ZOOM_OPACITY
+                ]
             }
         })
 
