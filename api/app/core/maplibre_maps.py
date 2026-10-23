@@ -239,14 +239,6 @@ class MapLibreMapGenerator:
     <style>
         body {{ margin: 0; padding: 0; background: #dee2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 10;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -261,7 +253,6 @@ class MapLibreMapGenerator:
     </style>
 </head>
 <body>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div id="map"></div>
 <div class="legend-card">
     <div class="legend-title"><b>Legend</b></div>
@@ -441,14 +432,6 @@ class MapLibreMapGenerator:
     <style>
         body {{ margin: 0; padding: 0; background: #dee2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 10;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -463,7 +446,6 @@ class MapLibreMapGenerator:
     </style>
 </head>
 <body>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div id="map"></div>
 <div class="legend-card">
     <div class="legend-title"><b>Cycleway Flow</b></div>
@@ -615,14 +597,6 @@ class MapLibreMapGenerator:
     <style>
         body {{ margin: 0; padding: 0; background: #dee2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 10;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -637,7 +611,6 @@ class MapLibreMapGenerator:
     </style>
 </head>
 <body>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div id="map"></div>
 <div class="legend-card">
     <div class="legend-title"><b>Project Performance</b></div>
@@ -776,14 +749,6 @@ class MapLibreMapGenerator:
     <style>
         body {{ margin: 0; padding: 0; background: #dee2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 10;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -807,7 +772,6 @@ class MapLibreMapGenerator:
     </style>
 </head>
 <body>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div class="purpose-selector">
     <label><b>Trip Purpose: </b></label>
     <select id="purpose-select">
@@ -1015,14 +979,6 @@ class MapLibreMapGenerator:
     <style>
         body {{ margin: 0; padding: 0; background: #dee2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 10;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -1037,7 +993,6 @@ class MapLibreMapGenerator:
     </style>
 </head>
 <body>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div id="map"></div>
 <div class="legend-card">
     <div class="legend-title"><b>Legend</b></div>
@@ -1223,14 +1178,6 @@ class MapLibreMapGenerator:
         }}
         #badge-before {{ left: 20px; }}
         #badge-after {{ right: 20px; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 30;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -1250,7 +1197,6 @@ class MapLibreMapGenerator:
 <div id="slider-container"><div id="slider-handle">↔</div></div>
 <div id="badge-before" class="badge">Baseline: {reference_scenario_prefix}</div>
 <div id="badge-after" class="badge">Project: {scenario_prefix}</div>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div class="legend-card">
     <div class="legend-title"><b>Legend</b></div>
     <div class="legend-item"><div class="legend-line" style="background: #27ae60; height: 3.5px;"></div><span>Existing Cycleway</span></div>
@@ -1409,14 +1355,6 @@ class MapLibreMapGenerator:
     <style>
         body {{ margin: 0; padding: 0; background: #dee2e6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
         #map {{ position: absolute; top: 0; bottom: 0; width: 100%; }}
-        .north-arrow {{
-            position: absolute; top: 20px; left: 20px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid black; border-radius: 2px; padding: 4px 10px;
-            font-family: "Times New Roman", Times, serif; font-size: 16px;
-            font-weight: bold; text-align: center; color: black; line-height: 1.1;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); z-index: 10;
-        }}
         .legend-card {{
             position: absolute; bottom: 25px; right: 25px;
             background: rgba(255, 255, 255, 0.90);
@@ -1431,7 +1369,6 @@ class MapLibreMapGenerator:
     </style>
 </head>
 <body>
-<div class="north-arrow"><b>N</b><br>↑</div>
 <div id="map"></div>
 <div class="legend-card">
     <div class="legend-title"><b>Legend</b></div>

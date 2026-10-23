@@ -294,3 +294,24 @@ def test_maplibre_generator_progressive_lod(tmp_path):
 
     assert "13, 0.15" in delta_content or "13,0.15" in delta_content
     assert "15, 0.4" in delta_content or "15,0.4" in delta_content
+
+def test_maplibre_generator_navigation_controls_and_no_north_arrow(tmp_path):
+    generator = MapLibreMapGenerator(output_dir=str(tmp_path))
+    bbox = [-70.7, -33.5, -70.6, -33.4]
+
+    flow_path = generator.generate_flow_map("test_scenario", bbox)
+    delta_path = generator.generate_delta_map("test_scenario", bbox)
+    bikelanes_path = generator.generate_bikelanes_flow_map("test_scenario", bbox)
+    perf_path = generator.generate_project_performance_map("test_scenario", bbox)
+    impedance_path = generator.generate_impedance_map("test_scenario", "santiago", bbox)
+    compare_path = generator.generate_compare_map("test_base", "test_proj", bbox)
+    h3_path = generator.generate_h3_purpose_map("test_scenario", bbox, purpose="work")
+
+    all_paths = [flow_path, delta_path, bikelanes_path, perf_path, impedance_path, compare_path, h3_path]
+    for path in all_paths:
+        assert os.path.exists(path)
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        assert "north-arrow" not in content, f"north-arrow found in {os.path.basename(path)}"
+        if path != compare_path:
+            assert "NavigationControl" in content, f"NavigationControl missing from {os.path.basename(path)}"
