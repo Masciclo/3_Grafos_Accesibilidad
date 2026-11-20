@@ -12,6 +12,7 @@
 [![PostGIS](https://img.shields.io/badge/PostGIS-3.3+-blue)](https://postgis.net/)
 [![pgRouting](https://img.shields.io/badge/pgRouting-3.5+-orange)](https://pgrouting.org/)
 [![H3 Grid](https://img.shields.io/badge/H3_Discrete_Grid-Res_8%2F9-hexagon)](https://h3geo.org/)
+[![DOI](https://zenodo.org/badge/1465250770.svg)](https://doi.org/10.5281/zenodo.24397032)
 
 ---
 
